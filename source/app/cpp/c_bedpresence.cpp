@@ -1,4 +1,5 @@
 #include "rdno_bedpresence/c_bedpresence.h"
+#include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
 #include "rdno_core/c_dio.h"
 #include "rdno_core/c_adc.h"
@@ -12,10 +13,11 @@
 
 using namespace ncore;
 
-static s16               gClientIndex  = -1;                   // Client index for the TCP client
-static nstatus::status_t gClientStatus = nstatus::Idle;        //
-static nstatus::status_t gWifiStatus   = nstatus::Idle;        //
-static const char*       gHostName     = "BedPresenceDevice";  // Hostname for the device
+static ncore::linear_alloc_t gAllocator;                           // Linear allocator for memory management
+static s16                   gClientIndex  = -1;                   // Client index for the TCP client
+static nstatus::status_t     gClientStatus = nstatus::Idle;        //
+static nstatus::status_t     gWifiStatus   = nstatus::Idle;        //
+static const char*           gHostName     = "BedPresenceDevice";  // Hostname for the device
 
 // TODO; we need a way to provide a 'logger', so that in the final build we can
 //       disable the serial output, and use a different method to log messages.
@@ -24,6 +26,10 @@ static const char*       gHostName     = "BedPresenceDevice";  // Hostname for t
 void setup()
 {
     nserial::Begin(ncore::nserial::nbaud::Rate115200);  // Initialize serial communication at 115200 baud
+
+    const u32 alloc_size = 1024 * 8;
+    byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
+    gAllocator.setup(alloc_mem, alloc_size);     // Set up the linear allocator with the allocated memory
 
     // Initialize the WiFi module
     nwifi::ConfigIpAddrNone();
@@ -37,7 +43,7 @@ void setup()
     }
 
     // Connect client to connect to the server
-    gClientIndex  = 0;
+    gClientIndex  = nclient::NewClient(&gAllocator);                         // Create a new client
     gClientStatus = nclient::Connect(gClientIndex, SERVER_IP, SERVER_PORT);  // Connect to the server
 
     // This is where you would set up your hardware, peripherals, etc.
