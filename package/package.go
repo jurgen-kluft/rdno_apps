@@ -6,22 +6,25 @@ import (
 	rdno_wifi "github.com/jurgen-kluft/rdno_wifi/package"
 )
 
-// GetPackage returns the package object of 'rdno_bedpresence'
+const (
+	repo_path = "github.com\\jurgen-kluft"
+	repo_name = "rdno_bedpresence"
+)
+
 func GetPackage() *denv.Package {
-	// Dependencies
-	ucorepkg := rdno_core.GetPackage()
-	uwifipkg := rdno_wifi.GetPackage()
+	name := repo_name
 
-	// The main (rdno_bedpresence) package
-	mainpkg := denv.NewPackage("rdno_bedpresence")
-	mainpkg.AddPackage(ucorepkg)
-	mainpkg.AddPackage(uwifipkg)
+	corepkg := rdno_core.GetPackage()
+	wifipkg := rdno_wifi.GetPackage()
 
-	// 'rdno_bedpresence' application
-	mainapp := denv.SetupCppAppProject("rdno_bedpresence", "github.com\\jurgen-kluft\\rdno_bedpresence")
-	mainapp.AddDependencies(ucorepkg.GetMainLib()...)
-	mainapp.AddDependencies(uwifipkg.GetMainLib()...)
+	mainpkg := denv.NewPackage(repo_path, repo_name)
+	mainpkg.AddPackage(corepkg)
+	mainpkg.AddPackage(wifipkg)
 
-	mainpkg.AddMainApp(mainapp)
+	mainlib := denv.SetupCppLibProject(mainpkg, name)
+	mainlib.AddDependencies(corepkg.GetMainLib()...)
+	mainlib.AddDependencies(wifipkg.GetMainLib()...)
+
+	mainpkg.AddMainLib(mainlib)
 	return mainpkg
 }
