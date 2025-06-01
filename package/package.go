@@ -21,10 +21,10 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(corepkg)
 	mainpkg.AddPackage(wifipkg)
 
-	mainlib := denv.SetupCppLibProject(mainpkg, name)
-	mainlib.AddDependencies(corepkg.GetMainLib()...)
-	mainlib.AddDependencies(wifipkg.GetMainLib()...)
+	mainapp := denv.SetupCppAppProject(mainpkg, name)
+	mainapp.AddDependencies(corepkg.GetMainLib()...)
+	mainapp.AddDependencies(wifipkg.GetMainLib()...)
 
-	mainpkg.AddMainLib(mainlib)
+	mainpkg.AddMainApp(mainapp)
 	return mainpkg
 }
