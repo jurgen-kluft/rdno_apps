@@ -1,4 +1,6 @@
-#include "rdno_bedpresence/c_bedpresence.h"
+
+#include "bedpresence/c_bedpresence.h"
+
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
 #include "rdno_core/c_dio.h"
@@ -9,7 +11,7 @@
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
 
-#include "rdno_bedpresence/c_network.secret.h"
+#include "bedpresence/c_network.secret.h"
 
 using namespace ncore;
 
@@ -34,7 +36,7 @@ void setup()
     // Initialize the WiFi module
     nwifi::ConfigIpAddrNone();
     nwifi::SetHostname(gHostName);
-    nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network with SSID "OBNOSIS8"
+    nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
 
     gWifiStatus = nwifi::Status();  // Get the current WiFi status
     if (gWifiStatus == nstatus::Connected)
@@ -49,7 +51,7 @@ void setup()
     // This is where you would set up your hardware, peripherals, etc.
     npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
 
-    nserial::Println("Bed Presence ...");
+    nserial::Println("Setup done...");
 }
 
 // Constants
@@ -103,8 +105,8 @@ void loop()
     }
     else
     {
-        ntimer::Delay(2000);  // Wait for 2 seconds before trying to reconnect
-        // nwifi::Reconnect();   // Reconnect to the WiFi network
+        ntimer::Delay(10000);  // Wait for 10 seconds
+        nwifi::Reconnect();   // Reconnect to the WiFi network
     }
 
     ntimer::Delay(10000);  // Wait for 10 seconds

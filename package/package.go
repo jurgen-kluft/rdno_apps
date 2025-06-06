@@ -1,4 +1,4 @@
-package rdno_bedpresence
+package rdno_apps
 
 import (
 	denv "github.com/jurgen-kluft/ccode/denv"
@@ -8,7 +8,7 @@ import (
 
 const (
 	repo_path = "github.com\\jurgen-kluft"
-	repo_name = "rdno_bedpresence"
+	repo_name = "rdno_apps"
 )
 
 func GetPackage() *denv.Package {
@@ -21,10 +21,16 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(corepkg)
 	mainpkg.AddPackage(wifipkg)
 
-	mainapp := denv.SetupCppAppProject(mainpkg, name)
-	mainapp.AddDependencies(corepkg.GetMainLib()...)
-	mainapp.AddDependencies(wifipkg.GetMainLib()...)
+	// Setup the main applications
+	bedpresence := denv.SetupCppAppProject(mainpkg, name+"_bedpresence", "bedpresence")
+	bedpresence.AddDependencies(corepkg.GetMainLib()...)
+	bedpresence.AddDependencies(wifipkg.GetMainLib()...)
 
-	mainpkg.AddMainApp(mainapp)
+	airquality := denv.SetupCppAppProject(mainpkg, name+"_airquality", "airquality")
+	airquality.AddDependencies(corepkg.GetMainLib()...)
+	airquality.AddDependencies(wifipkg.GetMainLib()...)
+
+	mainpkg.AddMainApp(bedpresence)
+	mainpkg.AddMainApp(airquality)
 	return mainpkg
 }

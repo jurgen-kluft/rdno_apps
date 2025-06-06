@@ -1,12 +1,5 @@
-# rdno_blinky
+# rdno_apps
 
-A simple app for Arduino that depends on `rdno_wifi`, `rdno_network`, and ``rdno_core`.
+- Air Quality Monitoring
+- Bed Occupancy Detection
 
-## Unit Testing
-
-A `unittest` can be built on MacOS, Linux and Windows, and will mock necessary systems like:
-
-- Digital I/O
-- Serial
-- I2C
-- WiFi
