@@ -44,7 +44,7 @@ void setup()
         nserial::Println("Connected to WiFi ...");
     }
 
-    // Connect client to connect to the server
+    // Connect client to the server
     gClientIndex  = nclient::NewClient(&gAllocator);                         // Create a new client
     gClientStatus = nclient::Connect(gClientIndex, SERVER_IP, SERVER_PORT);  // Connect to the server
 

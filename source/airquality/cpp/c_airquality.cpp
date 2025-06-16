@@ -21,10 +21,10 @@ static nstatus::status_t     gClientStatus = nstatus::Idle;       //
 static nstatus::status_t     gWifiStatus   = nstatus::Idle;       //
 static const char*           gHostName     = "AirQualityDevice";  // Hostname for the device
 
-// TODO; we need a way to provide a 'logger', so that in the final build we can
-//       disable the serial output, and use a different method to log messages.
+#include "rdno_sensors/c_bh1750.h"
+#include "rdno_sensors/c_bme280.h"
+#include "rdno_sensors/c_scd4x.h"
 
-// Initialize the system
 void setup()
 {
     nserial::Begin(ncore::nserial::nbaud::Rate115200);  // Initialize serial communication at 115200 baud
@@ -32,6 +32,11 @@ void setup()
     const u32 alloc_size = 1024 * 8;
     byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
     gAllocator.setup(alloc_mem, alloc_size);     // Set up the linear allocator with the allocated memory
+
+    // Initialize the sensors
+    nsensors::initBH1750(&gAllocator, 0x23);  // Initialize the BH1750 sensor with the I2C address 0x23
+    nsensors::initBME280(&gAllocator, 0x76);  // Initialize the BME280 sensor with the I2C address 0x76
+    nsensors::initSCD41(&gAllocator, 0x62);   // Initialize the SCD4X sensor with the I2C address 0x62
 
     // Initialize the WiFi module
     nwifi::ConfigIpAddrNone();
@@ -44,7 +49,7 @@ void setup()
         nserial::Println("Connected to WiFi ...");
     }
 
-    // Connect client to connect to the server
+    // Connect client to the server
     gClientIndex  = nclient::NewClient(&gAllocator);                         // Create a new client
     gClientStatus = nclient::Connect(gClientIndex, SERVER_IP, SERVER_PORT);  // Connect to the server
 
@@ -53,6 +58,10 @@ void setup()
 
     nserial::Println("Setup done...");
 }
+
+static nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
+static u16                     gSequence = 0;  // Sequence number for the packet
+static const u8                kVersion  = 1;  // Version number for the packet
 
 // Main loop of the application
 void loop()
@@ -66,6 +75,36 @@ void loop()
         if (gClientStatus == nstatus::Connected)
         {
             nserial::Println("[Loop] Connected to Server ...");
+
+            // Read the BH1750 sensor data
+            s32 lux = 0;
+            nsensors::updateBH1750(lux);
+
+            // Read the BME280 sensor data
+            f32 temperature = 0.0f;
+            f32 pressure    = 0.0f;
+            f32 humidity    = 0.0f;
+            nsensors::updateBME280(temperature, pressure, humidity);
+
+            // Read the SCD41 sensor data
+            f32 humidity_scd    = 0.0f;  // Initialize humidity value for SCD41
+            f32 temperature_scd = 0.0f;  // Initialize temperature value for SCD41
+            u16 co2_scd         = 0;     // Initialize CO2 value
+            nsensors::updateSCD41(humidity_scd, temperature_scd, co2_scd);
+
+            // Write a custom (binary-format) network message
+            gSensorPacket.begin(gSequence++, kVersion);
+            gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom1, nsensor::DeviceLabel::AirQuality);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Light, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, lux);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, temperature);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Pressure, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, pressure);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, humidity);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::CO2, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, co2_scd);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, nsensor::SensorChannel::Channel1, nsensor::SensorState::On, humidity_scd);
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, nsensor::SensorChannel::Channel1, nsensor::SensorState::On, temperature_scd);
+            gSensorPacket.finalize();
+
+            nclient::Write(gClientIndex, gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
         }
         else
         {  // If the client is not connected, try to reconnect
