@@ -13,8 +13,6 @@ const (
 )
 
 func GetPackage() *denv.Package {
-	name := repo_name
-
 	corepkg := rdno_core.GetPackage()
 	wifipkg := rdno_wifi.GetPackage()
 	sensorspkg := rdno_sensors.GetPackage()
@@ -25,11 +23,11 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(sensorspkg)
 
 	// Setup the main applications
-	bedpresence := denv.SetupCppAppProject(mainpkg, name+"_bedpresence", "bedpresence")
+	bedpresence := denv.SetupCppAppProject(mainpkg, "bedpresence", "bedpresence")
 	bedpresence.AddDependencies(corepkg.GetMainLib()...)
 	bedpresence.AddDependencies(wifipkg.GetMainLib()...)
 
-	airquality := denv.SetupCppAppProject(mainpkg, name+"_airquality", "airquality")
+	airquality := denv.SetupCppAppProject(mainpkg, "airquality", "airquality")
 	airquality.AddDependencies(corepkg.GetMainLib()...)
 	airquality.AddDependencies(wifipkg.GetMainLib()...)
 	airquality.AddDependencies(sensorspkg.GetMainLib()...)
