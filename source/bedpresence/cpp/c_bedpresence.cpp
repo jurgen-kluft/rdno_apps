@@ -13,12 +13,11 @@
 
 #include "bedpresence/c_network.secret.h"
 
+#include "Arduino.h"
+
 using namespace ncore;
 
 static ncore::linear_alloc_t gAllocator;                           // Linear allocator for memory management
-static s16                   gClientIndex  = -1;                   // Client index for the TCP client
-static nstatus::status_t     gClientStatus = nstatus::Idle;        //
-static nstatus::status_t     gWifiStatus   = nstatus::Idle;        //
 static const char*           gHostName     = "BedPresenceDevice";  // Hostname for the device
 
 // TODO; we need a way to provide a 'logger', so that in the final build we can
@@ -27,7 +26,7 @@ static const char*           gHostName     = "BedPresenceDevice";  // Hostname f
 // Initialize the system
 void setup()
 {
-    nserial::Begin(ncore::nserial::nbaud::Rate115200);  // Initialize serial communication at 115200 baud
+    nserial::Begin();  // Initialize serial communication at 115200 baud
 
     const u32 alloc_size = 1024 * 8;
     byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
@@ -38,15 +37,15 @@ void setup()
     nwifi::SetHostname(gHostName);
     nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
 
-    gWifiStatus = nwifi::Status();  // Get the current WiFi status
-    if (gWifiStatus == nstatus::Connected)
+    nstatus::status_t wifiStatus = nwifi::Status();  // Get the current WiFi status
+    if (wifiStatus == nstatus::Connected)
     {
         nserial::Println("Connected to WiFi ...");
     }
 
     // Connect client to the server
-    gClientIndex  = nclient::NewClient(&gAllocator);                         // Create a new client
-    gClientStatus = nclient::Connect(gClientIndex, SERVER_IP, SERVER_PORT);  // Connect to the server
+    nclient::NewClient();                         // Create a new client
+    nstatus::status_t clientStatus = nclient::Connect(SERVER_IP, SERVER_PORT);  // Connect to the server
 
     // This is where you would set up your hardware, peripherals, etc.
     npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
@@ -72,13 +71,13 @@ static const u8                kVersion  = 1;  // Version number for the packet
 // Main loop of the application
 void loop()
 {
-    gWifiStatus = nwifi::Status();  // Get the current WiFi status
-    if (gWifiStatus == nstatus::Connected)
+    nstatus::status_t wifiStatus = nwifi::Status();  // Get the current WiFi status
+    if (wifiStatus == nstatus::Connected)
     {
         nserial::Println("[Loop] Connected to WiFi ...");
 
-        gClientStatus = nclient::Connected(gClientIndex);
-        if (gClientStatus == nstatus::Connected)
+        nstatus::status_t clientStatus = nclient::Connected();
+        if (clientStatus == nstatus::Connected)
         {
             nserial::Println("[Loop] Connected to Server ...");
 
@@ -90,23 +89,23 @@ void loop()
 
             // Write a custom (binary-format) network message
             gSensorPacket.begin(gSequence++, kVersion);
-            gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom1, nsensor::DeviceLabel::BedPresence);                                                    // Write the header for the left side sensor
-            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorChannel::Channel0, nsensor::SensorState::On, left_side_presence);   // Write the left side sensor value
-            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorChannel::Channel1, nsensor::SensorState::On, right_side_presence);  // Write the left side sensor value
+            gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);                   // Write the header for the left side sensor
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, left_side_presence);   // Write the left side sensor value
+            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, right_side_presence);  // Write the left side sensor value
             gSensorPacket.finalize();
 
-            nclient::Write(gClientIndex, gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+            nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
         }
         else
         {  // If the client is not connected, try to reconnect
             nserial::Println("[Loop] Connecting to server ...");
-            gClientStatus = nclient::Connect(gClientIndex, SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
+            nclient::Connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
         }
     }
     else
     {
         ntimer::Delay(10000);  // Wait for 10 seconds
-        nwifi::Reconnect();   // Reconnect to the WiFi network
+        nwifi::Reconnect();    // Reconnect to the WiFi network
     }
 
     ntimer::Delay(10000);  // Wait for 10 seconds

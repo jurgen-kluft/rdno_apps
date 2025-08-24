@@ -32,7 +32,14 @@ func GetPackage() *denv.Package {
 	airquality.AddDependencies(wifipkg.GetMainLib()...)
 	airquality.AddDependencies(sensorspkg.GetMainLib()...)
 
+	humanpresence := denv.SetupCppAppProject(mainpkg, "humanpresence", "humanpresence")
+	humanpresence.AddDependencies(corepkg.GetMainLib()...)
+	humanpresence.AddDependencies(wifipkg.GetMainLib()...)
+	humanpresence.AddDependencies(sensorspkg.GetMainLib()...)
+
 	mainpkg.AddMainApp(bedpresence)
 	mainpkg.AddMainApp(airquality)
+	mainpkg.AddMainApp(humanpresence)
+
 	return mainpkg
 }
