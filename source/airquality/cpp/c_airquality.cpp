@@ -63,16 +63,10 @@ static const u8                kVersion  = 1;  // Version number for the packet
 // Main loop of the application
 void loop()
 {
-    nstatus::status_t wifiStatus = nwifi::Status();  // Get the current WiFi status
-    if (wifiStatus == nstatus::Connected)
+    if (nwifi::Status() == nstatus::Connected)
     {
-        nserial::Println("[Loop] Connected to WiFi ...");
-
-        nstatus::status_t clientStatus = nclient::Connected();
-        if (clientStatus == nstatus::Connected)
+        if (nclient::Connected() == nstatus::Connected)
         {
-            nserial::Println("[Loop] Connected to Server ...");
-
             // Read the BH1750 sensor data
             s32 lux = 0;
             nsensors::updateBH1750(lux);
@@ -104,15 +98,42 @@ void loop()
             nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
         }
         else
-        {  // If the client is not connected, try to reconnect
+        {
+            // If the client is not connected -> reconnect
             nserial::Println("[Loop] Connecting to server ...");
-            clientStatus = nclient::Connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
+            nclient::Connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
+            nstatus::status_t clientStatus = nclient::Connected();
+            nstatus::status_t wifiStatus   = nwifi::Status();
+            while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected)
+            {
+                ntimer::Delay(3000);  // Wait for 3 seconds before checking again
+                clientStatus = nclient::Connected();
+                wifiStatus   = nwifi::Status();
+            }
+            if (wifiStatus == nstatus::Connected && clientStatus == nstatus::Connected)
+            {
+                nserial::Println("[Loop] Connected to server ...");
+
+                IPAddress_t localIP = nclient::LocalIP();
+                nserial::Println("Local IP: ");
+                nserial::PrintIp(localIP);
+             }
         }
     }
     else
     {
-        ntimer::Delay(10000);  // Wait for 10 seconds
-        nwifi::Reconnect();    // Reconnect to the WiFi network
+        nwifi::Disconnect();                              // Disconnect from WiFi
+        ntimer::Delay(5000);                              // Wait for 5 seconds
+        nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
+        nstatus::status_t wifiStatus = nwifi::Status();
+        while (wifiStatus != nstatus::Connected)
+        {
+            nserial::Println("Connecting to WiFi ...");
+            ntimer::Delay(3000);  // Wait for 3 seconds before checking again
+            wifiStatus = nwifi::Status();
+        }
+
+        nserial::Println("[Loop] Connected to WiFi ...");
     }
 
     ntimer::Delay(10000);  // Wait for 10 seconds

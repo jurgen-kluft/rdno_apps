@@ -14,16 +14,25 @@
 
 #include "Arduino.h"
 
+#include "rdno_sensors/c_hmmd.h"
+
 using namespace ncore;
 
-ncore::linear_alloc_t gAllocator;                    // Linear allocator for memory management
-const char*           gHostName = "PresenceDevice";  // Hostname for the device
+ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
+ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
-#include "rdno_sensors/c_hmmd.h"
+void setup_default_config()
+{
+    strlcpy(gConfig.m_ssid, WIFI_SSID, sizeof(gConfig.m_ssid));                      // Default WiFi SSID
+    strlcpy(gConfig.m_password, WIFI_PASSWORD, sizeof(gConfig.m_password));          // Default WiFi password
+    strlcpy(gConfig.m_remote_server, "10.0.0.69", sizeof(gConfig.m_remote_server));  // Default server IP address
+    gConfig.m_remote_port = 31337;                                                   // Default server port number
+}
 
 void setup()
 {
-    nserial::Begin();  // Initialize serial communication at 115200 baud
+    nserial::Begin();         // Initialize serial communication at 115200 baud
+    nvstore::Load(&gConfig);  // Load configuration from non-volatile storage
 
     const u32 alloc_size = 1024 * 8;
     byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
@@ -73,30 +82,29 @@ void loop()
             f32 distance = 0.0f;
             if (nsensors::readHMMD(&distance))
             {
-                Serial.print("Distance: ");
-                Serial.print(distance);
-                Serial.println(" cm");
+                // Serial.print("Distance: ");
+                // Serial.print(distance);
+                // Serial.println(" cm");
 
                 // Write a custom (binary-format) network message
-                // gSensorPacket.begin(gSequence++, kVersion);
-                // gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1 | nsensor::DeviceLocation::Area1, nsensor::DeviceLabel::Presence);
-                // gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
-                // gSensorPacket.finalize();
-
-                // nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                gSensorPacket.begin(gSequence++, kVersion);
+                gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1 | nsensor::DeviceLocation::Area1, nsensor::DeviceLabel::Presence);
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
+                gSensorPacket.finalize();
+                nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
         else
         {
-            // If the client is not connected -> reconnect
+            nclient::Stop();  // Stop any existing client connection
+
             nserial::Println("[Loop] Connecting to server ...");
-            nclient::Connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
             nstatus::status_t clientStatus = nclient::Connected();
             nstatus::status_t wifiStatus   = nwifi::Status();
             while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected)
             {
-                ntimer::Delay(3000);  // Wait for 3 seconds before checking again
-                clientStatus = nclient::Connected();
+                ntimer::Delay(3000);                                             // Wait for 3 seconds before checking again
+                clientStatus = nclient::Connect(SERVER_IP, SERVER_PORT, 10000);  // Reconnect to the server (already has timeout=10 seconds)
                 wifiStatus   = nwifi::Status();
             }
             if (wifiStatus == nstatus::Connected && clientStatus == nstatus::Connected)
@@ -104,8 +112,17 @@ void loop()
                 nserial::Println("[Loop] Connected to server ...");
 
                 IPAddress_t localIP = nclient::LocalIP();
-                Serial.println("Local IP: " + String(localIP.m_address[0]) + "." + String(localIP.m_address[1]) + "." + String(localIP.m_address[2]) + "." + String(localIP.m_address[3]));
+                nserial::Print("IP: ");
+                nserial::PrintIp(localIP);
+                nserial::Println("");
+
+                MACAddress_t mac = nwifi::MacAddress();
+                nserial::Print("MAC: ");
+                nserial::PrintMac(mac);
+                nserial::Println("");
             }
+
+            ntimer::Delay(3000);  // Wait for 3 seconds
         }
     }
     else
