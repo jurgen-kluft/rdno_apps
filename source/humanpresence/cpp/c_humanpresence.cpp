@@ -5,10 +5,14 @@
 #include "rdno_core/c_dio.h"
 #include "rdno_core/c_adc.h"
 #include "rdno_wifi/c_wifi.h"
-#include "rdno_wifi/c_client.h"
+#include "rdno_wifi/c_remote.h"
+#include "rdno_wifi/c_node.h"
+#include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_str.h"
+#include "rdno_core/c_system.h"
 
 #include "humanpresence/c_network.secret.h"
 
@@ -21,50 +25,79 @@ using namespace ncore;
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
-void setup_default_config()
+namespace ncore
 {
-    strlcpy(gConfig.m_ssid, WIFI_SSID, sizeof(gConfig.m_ssid));                      // Default WiFi SSID
-    strlcpy(gConfig.m_password, WIFI_PASSWORD, sizeof(gConfig.m_password));          // Default WiFi password
-    strlcpy(gConfig.m_remote_server, "10.0.0.69", sizeof(gConfig.m_remote_server));  // Default server IP address
-    gConfig.m_remote_port = 31337;                                                   // Default server port number
-}
+    s16 key_to_index(str_t const& str)
+    {
+        s16 param_id = -1;
+        switch (str_len(str))
+        {
+            case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_SSID : -1; break;
+            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
+            case 7: param_id = str_eq_n(str, "ap_ssid", 7, false) ? nvstore::PARAM_ID_AP_SSID : -1; break;
+            case 11:
+                param_id = str_eq_n(str, "ap_password", 11, false) ? nvstore::PARAM_ID_AP_PASSWORD : -1;
+                param_id = param_id == -1 ? str_eq_n(str, "remote_port", 11, false) ? nvstore::PARAM_ID_REMOTE_PORT : -1 : param_id;
+                break;
+            case 13: param_id = str_eq_n(str, "remote_server", 13, false) ? nvstore::PARAM_ID_REMOTE_SERVER : -1; break;
+        }
+        if (param_id < 0)
+        {
+            s32 value = 0;
+            if (from_str(str, &value, 10) && value >= 0 && value < 256)
+            {
+                param_id = static_cast<s16>(value);
+            }
+        }
+        return param_id;
+    }
+
+    void setup_default_config(nvstore::config_t* config)
+    {
+        nvstore::reset(config);  // Reset the configuration to default values
+        const str_t ssid = str_const(WIFI_SSID);
+        const str_t pass = str_const(WIFI_PASSWORD);
+        nvstore::set_string(config, nvstore::PARAM_ID_SSID, ssid);
+        nvstore::set_string(config, nvstore::PARAM_ID_PASSWORD, pass);
+        char  ap_ssid_buffer[32];
+        str_t ap_ssid = str_mutable(ap_ssid_buffer, 32);
+        str_append(ap_ssid, "HumanPresence-");
+        nsystem::get_unique_id(ap_ssid);
+        nvstore::set_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
+        const str_t ap_pass = str_const("32768");
+        nvstore::set_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_pass);
+        const str_t remote_server = str_const("10.0.0.69");
+        nvstore::set_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
+        const s32 remote_port = 31337;
+        nvstore::set_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
+    }
+}  // namespace ncore
 
 void setup()
 {
-    nserial::Begin();         // Initialize serial communication at 115200 baud
-    nvstore::Load(&gConfig);  // Load configuration from non-volatile storage
+    nserial::begin();  // Initialize serial communication at 115200 baud
 
     const u32 alloc_size = 1024 * 8;
-    byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
-    gAllocator.setup(alloc_mem, alloc_size);     // Set up the linear allocator with the allocated memory
+    byte*     alloc_mem  = nsystem::malloc(alloc_size);  // Allocate memory for the linear allocator
+    gAllocator.setup(alloc_mem, alloc_size);             // Set up the linear allocator with the allocated memory
 
     // Initialize the sensors
     const u8 rx = 15;            // RX pin for HMMD
     const u8 tx = 16;            // TX pin for HMMD
     nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
 
-    // Initialize the WiFi module
-    nwifi::Disconnect();                              // Disconnect from any existing WiFi connections
-    ntimer::Delay(1000);                              // Wait for 1 second
-    nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
-
-    nstatus::status_t wifiStatus = nwifi::Status();  // Get the current WiFi status
-    while (wifiStatus != nstatus::Connected)
+    // Initialize the WiFi node
+    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
     {
-        nserial::Println("Connecting to WiFi ...");
-        ntimer::Delay(3000);  // Wait for 3 seconds before checking again
-        wifiStatus = nwifi::Status();
+        setup_default_config(&gConfig);  // Set up default configuration values
+        nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
     }
-    nserial::Println("Connected to WiFi ...");
-
-    // Connect client to the server
-    bool clientOk = nclient::NewClient();  // Create a new client
-    Serial.println("Client: " + String(clientOk));
+    nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
     // npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
 
-    nserial::Println("Setup done...");
+    nserial::println("Setup done...");
 }
 
 nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
@@ -74,9 +107,11 @@ const u8                kVersion  = 1;  // Version number for the packet
 // Main loop of the application
 void loop()
 {
-    if (nwifi::Status() == nstatus::Connected)
+    nwifi::node_loop(&gConfig, ncore::key_to_index);  // Handle WiFi node operations
+
+    if (nwifi::status() == nstatus::Connected)
     {
-        if (nclient::Connected() == nstatus::Connected)
+        if (nremote::connected() == nstatus::Connected)
         {
             // Read the HMMD sensor data
             f32 distance = 0.0f;
@@ -91,54 +126,54 @@ void loop()
                 gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1 | nsensor::DeviceLocation::Area1, nsensor::DeviceLabel::Presence);
                 gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
                 gSensorPacket.finalize();
-                nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
         else
         {
-            nclient::Stop();  // Stop any existing client connection
+            nremote::stop();  // Stop any existing client connection
 
-            nserial::Println("[Loop] Connecting to server ...");
-            nstatus::status_t clientStatus = nclient::Connected();
-            nstatus::status_t wifiStatus   = nwifi::Status();
+            nserial::println("[Loop] Connecting to server ...");
+            nstatus::status_t clientStatus = nremote::connected();
+            nstatus::status_t wifiStatus   = nwifi::status();
             while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected)
             {
-                ntimer::Delay(3000);                                             // Wait for 3 seconds before checking again
-                clientStatus = nclient::Connect(SERVER_IP, SERVER_PORT, 10000);  // Reconnect to the server (already has timeout=10 seconds)
-                wifiStatus   = nwifi::Status();
+                ntimer::delay(3000);                                             // Wait for 3 seconds before checking again
+                clientStatus = nremote::connect(SERVER_IP, SERVER_PORT, 10000);  // Reconnect to the server (already has timeout=10 seconds)
+                wifiStatus   = nwifi::status();
             }
             if (wifiStatus == nstatus::Connected && clientStatus == nstatus::Connected)
             {
-                nserial::Println("[Loop] Connected to server ...");
+                nserial::println("[Loop] Connected to server ...");
 
-                IPAddress_t localIP = nclient::LocalIP();
-                nserial::Print("IP: ");
-                nserial::PrintIp(localIP);
-                nserial::Println("");
+                IPAddress_t localIP = nremote::local_IP();
+                nserial::print("IP: ");
+                nserial::print(localIP);
+                nserial::println("");
 
-                MACAddress_t mac = nwifi::MacAddress();
-                nserial::Print("MAC: ");
-                nserial::PrintMac(mac);
-                nserial::Println("");
+                MACAddress_t mac = nwifi::mac_address();
+                nserial::print("MAC: ");
+                nserial::print(mac);
+                nserial::println("");
             }
 
-            ntimer::Delay(3000);  // Wait for 3 seconds
+            ntimer::delay(3000);  // Wait for 3 seconds
         }
     }
     else
     {
-        nwifi::Disconnect();                              // Disconnect from WiFi
-        ntimer::Delay(5000);                              // Wait for 5 seconds
-        nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
-        nstatus::status_t wifiStatus = nwifi::Status();
+        nwifi::disconnect();                               // Disconnect from WiFi
+        ntimer::delay(5000);                               // Wait for 5 seconds
+        nwifi::begin_encrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
+        nstatus::status_t wifiStatus = nwifi::status();
         while (wifiStatus != nstatus::Connected)
         {
-            nserial::Println("Connecting to WiFi ...");
-            ntimer::Delay(3000);  // Wait for 3 seconds before checking again
-            wifiStatus = nwifi::Status();
+            nserial::println("Connecting to WiFi ...");
+            ntimer::delay(3000);  // Wait for 3 seconds before checking again
+            wifiStatus = nwifi::status();
         }
 
-        nserial::Println("[Loop] Connected to WiFi ...");
+        nserial::println("[Loop] Connected to WiFi ...");
     }
 }
 

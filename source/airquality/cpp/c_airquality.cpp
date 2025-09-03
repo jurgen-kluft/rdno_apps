@@ -6,7 +6,7 @@
 #include "rdno_core/c_dio.h"
 #include "rdno_core/c_adc.h"
 #include "rdno_wifi/c_wifi.h"
-#include "rdno_wifi/c_client.h"
+#include "rdno_wifi/c_remote.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
@@ -24,10 +24,10 @@ static const char*           gHostName = "AirQualityDevice";  // Hostname for th
 
 void setup()
 {
-    nserial::Begin();  // Initialize serial communication at 115200 baud
+    nserial::begin();  // Initialize serial communication at 115200 baud
 
     const u32 alloc_size = 1024 * 8;
-    byte*     alloc_mem  = gMalloc(alloc_size);  // Allocate memory for the linear allocator
+    byte*     alloc_mem  = nsystem::malloc(alloc_size);  // Allocate memory for the linear allocator
     gAllocator.setup(alloc_mem, alloc_size);     // Set up the linear allocator with the allocated memory
 
     // Initialize the sensors
@@ -36,24 +36,23 @@ void setup()
     nsensors::initSCD41(&gAllocator, 0x62);   // Initialize the SCD4X sensor with the I2C address 0x62
 
     // Initialize the WiFi module
-    nwifi::ConfigIpAddrNone();
-    nwifi::SetHostname(gHostName);
-    nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
+    nwifi::config_IP_AddrNone();
+    nwifi::set_host_name(gHostName);
+    nwifi::begin_encrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
 
-    nstatus::status_t wifiStatus = nwifi::Status();  // Get the current WiFi status
+    nstatus::status_t wifiStatus = nwifi::status();  // Get the current WiFi status
     if (wifiStatus == nstatus::Connected)
     {
-        nserial::Println("Connected to WiFi ...");
+        nserial::println("Connected to WiFi ...");
     }
 
     // Connect client to the server
-    nclient::NewClient();                                     // Create a new client
-    nstatus::status_t clientStatus = nclient::Connect(SERVER_IP, SERVER_PORT);  // Connect to the server
+    nstatus::status_t clientStatus = nremote::connect(SERVER_IP, SERVER_PORT);  // Connect to the server
 
     // This is where you would set up your hardware, peripherals, etc.
-    npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
+    npin::set_pinmode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
 
-    nserial::Println("Setup done...");
+    nserial::println("Setup done...");
 }
 
 static nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
@@ -63,9 +62,9 @@ static const u8                kVersion  = 1;  // Version number for the packet
 // Main loop of the application
 void loop()
 {
-    if (nwifi::Status() == nstatus::Connected)
+    if (nwifi::status() == nstatus::Connected)
     {
-        if (nclient::Connected() == nstatus::Connected)
+        if (nremote::connected() == nstatus::Connected)
         {
             // Read the BH1750 sensor data
             s32 lux = 0;
@@ -95,48 +94,48 @@ void loop()
             gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, nsensor::SensorModel::SCD4X, nsensor::SensorState::On, temperature_scd);
             gSensorPacket.finalize();
 
-            nclient::Write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+            nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
         }
         else
         {
             // If the client is not connected -> reconnect
-            nserial::Println("[Loop] Connecting to server ...");
-            nclient::Connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
-            nstatus::status_t clientStatus = nclient::Connected();
-            nstatus::status_t wifiStatus   = nwifi::Status();
+            nserial::println("[Loop] Connecting to server ...");
+            nremote::connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
+            nstatus::status_t clientStatus = nremote::connected();
+            nstatus::status_t wifiStatus   = nwifi::status();
             while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected)
             {
-                ntimer::Delay(3000);  // Wait for 3 seconds before checking again
-                clientStatus = nclient::Connected();
-                wifiStatus   = nwifi::Status();
+                ntimer::delay(3000);  // Wait for 3 seconds before checking again
+                clientStatus = nremote::connected();
+                wifiStatus   = nwifi::status();
             }
             if (wifiStatus == nstatus::Connected && clientStatus == nstatus::Connected)
             {
-                nserial::Println("[Loop] Connected to server ...");
+                nserial::println("[Loop] Connected to server ...");
 
-                IPAddress_t localIP = nclient::LocalIP();
-                nserial::Println("Local IP: ");
-                nserial::PrintIp(localIP);
+                IPAddress_t localIP = nremote::local_IP();
+                nserial::println("Local IP: ");
+                nserial::print(localIP);
              }
         }
     }
     else
     {
-        nwifi::Disconnect();                              // Disconnect from WiFi
-        ntimer::Delay(5000);                              // Wait for 5 seconds
-        nwifi::BeginEncrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
-        nstatus::status_t wifiStatus = nwifi::Status();
+        nwifi::disconnect();                              // Disconnect from WiFi
+        ntimer::delay(5000);                              // Wait for 5 seconds
+        nwifi::begin_encrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
+        nstatus::status_t wifiStatus = nwifi::status();
         while (wifiStatus != nstatus::Connected)
         {
-            nserial::Println("Connecting to WiFi ...");
-            ntimer::Delay(3000);  // Wait for 3 seconds before checking again
-            wifiStatus = nwifi::Status();
+            nserial::println("Connecting to WiFi ...");
+            ntimer::delay(3000);  // Wait for 3 seconds before checking again
+            wifiStatus = nwifi::status();
         }
 
-        nserial::Println("[Loop] Connected to WiFi ...");
+        nserial::println("[Loop] Connected to WiFi ...");
     }
 
-    ntimer::Delay(10000);  // Wait for 10 seconds
+    ntimer::delay(10000);  // Wait for 10 seconds
 }
 
 #ifndef TARGET_ESP32
