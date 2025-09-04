@@ -17,8 +17,57 @@
 
 using namespace ncore;
 
-static ncore::linear_alloc_t gAllocator;                           // Linear allocator for memory management
-static const char*           gHostName     = "BedPresenceDevice";  // Hostname for the device
+static ncore::linear_alloc_t gAllocator;  // Linear allocator for memory management
+ncore::nvstore::config_t     gConfig;     // Configuration structure for non-volatile storage
+static u64                   gLastSensorReadTimeInMillis = 0;
+
+namespace ncore
+{
+    s16 key_to_index(str_t const& str)
+    {
+        s16 param_id = -1;
+        switch (str_len(str))
+        {
+            case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_SSID : -1; break;
+            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
+            case 7: param_id = str_eq_n(str, "ap_ssid", 7, false) ? nvstore::PARAM_ID_AP_SSID : -1; break;
+            case 11:
+                param_id = str_eq_n(str, "ap_password", 11, false) ? nvstore::PARAM_ID_AP_PASSWORD : -1;
+                param_id = param_id == -1 ? str_eq_n(str, "remote_port", 11, false) ? nvstore::PARAM_ID_REMOTE_PORT : -1 : param_id;
+                break;
+            case 13: param_id = str_eq_n(str, "remote_server", 13, false) ? nvstore::PARAM_ID_REMOTE_SERVER : -1; break;
+        }
+        if (param_id < 0)
+        {
+            s32 value = 0;
+            if (from_str(str, &value, 10) && value >= 0 && value < 256)
+            {
+                param_id = static_cast<s16>(value);
+            }
+        }
+        return param_id;
+    }
+
+    void setup_default_config(nvstore::config_t* config)
+    {
+        nvstore::reset(config);  // Reset the configuration to default values
+        const str_t ssid = str_const(WIFI_SSID);
+        const str_t pass = str_const(WIFI_PASSWORD);
+        nvstore::set_string(config, nvstore::PARAM_ID_SSID, ssid);
+        nvstore::set_string(config, nvstore::PARAM_ID_PASSWORD, pass);
+        char  ap_ssid_buffer[32];
+        str_t ap_ssid = str_mutable(ap_ssid_buffer, 32);
+        str_append(ap_ssid, "AirQuality-");
+        nsystem::get_unique_id(ap_ssid);
+        nvstore::set_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
+        const str_t ap_pass = str_const("32768");
+        nvstore::set_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_pass);
+        const str_t remote_server = str_const("192.168.8.88");
+        nvstore::set_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
+        const s32 remote_port = 31337;
+        nvstore::set_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
+    }
+}  // namespace ncore
 
 // TODO; we need a way to provide a 'logger', so that in the final build we can
 //       disable the serial output, and use a different method to log messages.
@@ -30,24 +79,22 @@ void setup()
 
     const u32 alloc_size = 1024 * 8;
     byte*     alloc_mem  = nsystem::malloc(alloc_size);  // Allocate memory for the linear allocator
-    gAllocator.setup(alloc_mem, alloc_size);     // Set up the linear allocator with the allocated memory
+    gAllocator.setup(alloc_mem, alloc_size);             // Set up the linear allocator with the allocated memory
 
-    // Initialize the WiFi module
-    nwifi::config_IP_AddrNone();
-    nwifi::set_host_name(gHostName);
-    nwifi::begin_encrypted(WIFI_SSID, WIFI_PASSWORD);  // Connect to the WiFi network
-
-    nstatus::status_t wifiStatus = nwifi::status();  // Get the current WiFi status
-    if (wifiStatus == nstatus::Connected)
+    // Initialize the WiFi node
+    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
     {
-        nserial::println("Connected to WiFi ...");
+        setup_default_config(&gConfig);  // Set up default configuration values
+        nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
     }
 
-    // Connect client to the server
-    nstatus::status_t clientStatus = nremote::connect(SERVER_IP, SERVER_PORT);  // Connect to the server
+    // Initialize the WiFi node
+    nwifi::node_setup(&gConfig, ncore::key_to_index);
 
     // This is where you would set up your hardware, peripherals, etc.
     npin::set_pinmode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
+
+    gLastSensorReadTimeInMillis = ntimer::millis();
 
     nserial::println("Setup done...");
 }
@@ -59,55 +106,48 @@ const f32 ADC_STEPS = 1.0f / ((1 << R_BITS) - 1);  // Number of steps (2^R_BITS 
 const u8 kLeftSideGPIO  = 10;  // Pin number for the left side sensor
 const u8 kRightSideGPIO = 12;  // Pin number for the right side sensor
 
-// Convert ADC value to a value between 0.0 and 1.0
+// Convert ADC value to a value between 0 and 65535
 // Formula: presence = (adc_value / ADC_STEPS)
-inline float ToPresence(s32 adc_value) { return (static_cast<float>(adc_value) * ADC_STEPS); }
+inline s32 ToPresence(s32 adc_value) { return (static_cast<float>(adc_value) * ADC_STEPS) * 65535.0f; }
 
-static nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
-static u16                     gSequence = 0;  // Sequence number for the packet
-static const u8                kVersion  = 1;  // Version number for the packet
+static nsensor::SensorPacket_t gSensorPacket;           // Sensor packet for sending data
+static u16                     gSequence          = 0;  // Sequence number for the packet
+static const u8                kVersion           = 1;  // Version number for the packet
+static s32                     gLeftSidePresence  = 0;  // Presence value for the left side sensor
+static s32                     gRightSidePresence = 0;  // Presence value for the right side
 
 // Main loop of the application
 void loop()
 {
-    nstatus::status_t wifiStatus = nwifi::status();  // Get the current WiFi status
-    if (wifiStatus == nstatus::Connected)
+    if (nwifi::node_loop(&gConfig, ncore::key_to_index))
     {
-        nserial::println("[Loop] Connected to WiFi ...");
-
-        nstatus::status_t clientStatus = nremote::connected();
-        if (clientStatus == nstatus::Connected)
+        const u64 currentTimeInMillis = ntimer::millis();
+        if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 500)
         {
-            nserial::println("[Loop] Connected to Server ...");
+            gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             const s32 left_side          = nadc::analog_read(kLeftSideGPIO);  // Read the left side sensor value
-            const f32 left_side_presence = ToPresence(left_side);            // Convert the sensor value to voltage
+            const s32 left_side_presence = ToPresence(left_side);             // Convert the sensor value to voltage
 
             const s32 right_side          = nadc::analog_read(kRightSideGPIO);  // Read the right side sensor value
-            const s32 right_side_presence = ToPresence(right_side);            // Convert the sensor value to voltage
+            const s32 right_side_presence = ToPresence(right_side);             // Convert the sensor value to voltage
 
-            // Write a custom (binary-format) network message
-            gSensorPacket.begin(gSequence++, kVersion);
-            gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);                   // Write the header for the left side sensor
-            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, left_side_presence);   // Write the left side sensor value
-            gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, right_side_presence);  // Write the left side sensor value
-            gSensorPacket.finalize();
+            if (left_side_presence != gLeftSidePresence || right_side_presence != gRightSidePresence)
+            {
+                gLeftSidePresence  = left_side_presence;
+                gRightSidePresence = right_side_presence;
+                
+                // Write a custom (binary-format) network message
+                gSensorPacket.begin(gSequence++, kVersion);
+                gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);             // Write the header for the left side sensor
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, left_side_presence);   // Write the left side sensor value
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, right_side_presence);  // Write the left side sensor value
+                gSensorPacket.finalize();
 
-            nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
-        }
-        else
-        {  // If the client is not connected, try to reconnect
-            nserial::println("[Loop] Connecting to server ...");
-            nremote::connect(SERVER_IP, SERVER_PORT, 5000);  // Reconnect to the server (already has timeout=5 seconds)
+                nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+            }
         }
     }
-    else
-    {
-        ntimer::delay(10000);  // Wait for 10 seconds
-        nwifi::reconnect();    // Reconnect to the WiFi network
-    }
-
-    ntimer::delay(10000);  // Wait for 10 seconds
 }
 
 #ifndef TARGET_ESP32

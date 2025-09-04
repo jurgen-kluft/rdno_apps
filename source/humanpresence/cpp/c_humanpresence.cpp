@@ -16,14 +16,13 @@
 
 #include "humanpresence/c_network.secret.h"
 
-#include "Arduino.h"
-
 #include "rdno_sensors/c_hmmd.h"
 
 using namespace ncore;
 
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
+u64                      gLastSensorReadTimeInMillis = 0;
 
 namespace ncore
 {
@@ -66,7 +65,7 @@ namespace ncore
         nvstore::set_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
         const str_t ap_pass = str_const("32768");
         nvstore::set_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_pass);
-        const str_t remote_server = str_const("10.0.0.69");
+        const str_t remote_server = str_const("192.168.8.88");
         nvstore::set_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
         const s32 remote_port = 31337;
         nvstore::set_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
@@ -92,88 +91,54 @@ void setup()
         setup_default_config(&gConfig);  // Set up default configuration values
         nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
     }
+
     nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
     // npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
 
+    gLastSensorReadTimeInMillis = ntimer::millis();
+
     nserial::println("Setup done...");
 }
 
-nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
-u16                     gSequence = 0;  // Sequence number for the packet
-const u8                kVersion  = 1;  // Version number for the packet
+nsensor::SensorPacket_t gSensorPacket;          // Sensor packet for sending data
+u16                     gSequence     = 0;      // Sequence number for the packet
+const u8                kVersion      = 1;      // Version number for the packet
+s16                     gLastDistanceInCm = 32768;  // Last distance value read from the sensor
 
 // Main loop of the application
 void loop()
 {
-    nwifi::node_loop(&gConfig, ncore::key_to_index);  // Handle WiFi node operations
-
-    if (nwifi::status() == nstatus::Connected)
+    if (nwifi::node_loop(&gConfig, ncore::key_to_index))
     {
-        if (nremote::connected() == nstatus::Connected)
+        const u64 currentTimeInMillis = ntimer::millis();
+        if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 100)  // 10 times per second
         {
+            gLastSensorReadTimeInMillis = currentTimeInMillis;
+
             // Read the HMMD sensor data
-            f32 distance = 0.0f;
-            if (nsensors::readHMMD(&distance))
+            f32 fDistanceInCm = 0.0f;
+            if (nsensors::readHMMD(&fDistanceInCm))
             {
-                // Serial.print("Distance: ");
-                // Serial.print(distance);
-                // Serial.println(" cm");
+                const s16 distanceInCm = static_cast<s16>(fDistanceInCm);  // Convert to integer centimeters
+                if (distanceInCm != gLastDistanceInCm)
+                {
+                    gLastDistanceInCm = distanceInCm;
 
-                // Write a custom (binary-format) network message
-                gSensorPacket.begin(gSequence++, kVersion);
-                gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1 | nsensor::DeviceLocation::Area1, nsensor::DeviceLabel::Presence);
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
-                gSensorPacket.finalize();
-                nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                    // Serial.print("Distance: ");
+                    // Serial.print(distance);
+                    // Serial.println(" cm");
+
+                    // Write a custom (binary-format) network message
+                    gSensorPacket.begin(gSequence++, kVersion);
+                    gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
+                    gSensorPacket.finalize();
+                    nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                }
             }
         }
-        else
-        {
-            nremote::stop();  // Stop any existing client connection
-
-            nserial::println("[Loop] Connecting to server ...");
-            nstatus::status_t clientStatus = nremote::connected();
-            nstatus::status_t wifiStatus   = nwifi::status();
-            while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected)
-            {
-                ntimer::delay(3000);                                             // Wait for 3 seconds before checking again
-                clientStatus = nremote::connect(SERVER_IP, SERVER_PORT, 10000);  // Reconnect to the server (already has timeout=10 seconds)
-                wifiStatus   = nwifi::status();
-            }
-            if (wifiStatus == nstatus::Connected && clientStatus == nstatus::Connected)
-            {
-                nserial::println("[Loop] Connected to server ...");
-
-                IPAddress_t localIP = nremote::local_IP();
-                nserial::print("IP: ");
-                nserial::print(localIP);
-                nserial::println("");
-
-                MACAddress_t mac = nwifi::mac_address();
-                nserial::print("MAC: ");
-                nserial::print(mac);
-                nserial::println("");
-            }
-
-            ntimer::delay(3000);  // Wait for 3 seconds
-        }
-    }
-    else
-    {
-        nwifi::disconnect();                               // Disconnect from WiFi
-        ntimer::delay(5000);                               // Wait for 5 seconds
-        nwifi::begin_encrypted(WIFI_SSID, WIFI_PASSWORD);  // Reconnect to WiFi
-        nstatus::status_t wifiStatus = nwifi::status();
-        while (wifiStatus != nstatus::Connected)
-        {
-            nserial::println("Connecting to WiFi ...");
-            ntimer::delay(3000);  // Wait for 3 seconds before checking again
-            wifiStatus = nwifi::status();
-        }
-
-        nserial::println("[Loop] Connected to WiFi ...");
     }
 }
 
