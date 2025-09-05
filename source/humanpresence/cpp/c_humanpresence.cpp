@@ -86,13 +86,18 @@ void setup()
     nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
 
     // Initialize the WiFi node
+    nserial::println("Load config from non-volatile memory.");
     if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
     {
+        nserial::println("Failed to Load config from non-volatile memory.");
+        nserial::println("Initializing default config.");
         setup_default_config(&gConfig);  // Set up default configuration values
-        nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
+        nserial::println("Saving config to non-volatile memory.");
+        nvstore::save(&gConfig);  // Save the default configuration to non-volatile storage
     }
 
-    nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
+    // nserial::println("Node setup started...");
+    // nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
     // npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
@@ -102,15 +107,15 @@ void setup()
     nserial::println("Setup done...");
 }
 
-nsensor::SensorPacket_t gSensorPacket;          // Sensor packet for sending data
-u16                     gSequence     = 0;      // Sequence number for the packet
-const u8                kVersion      = 1;      // Version number for the packet
+nsensor::SensorPacket_t gSensorPacket;              // Sensor packet for sending data
+u16                     gSequence         = 0;      // Sequence number for the packet
+const u8                kVersion          = 1;      // Version number for the packet
 s16                     gLastDistanceInCm = 32768;  // Last distance value read from the sensor
 
 // Main loop of the application
 void loop()
 {
-    if (nwifi::node_loop(&gConfig, ncore::key_to_index))
+    //if (nwifi::node_loop(&gConfig, ncore::key_to_index))
     {
         const u64 currentTimeInMillis = ntimer::millis();
         if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 100)  // 10 times per second
@@ -118,19 +123,22 @@ void loop()
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             // Read the HMMD sensor data
-            u8 detection = 0;
+            u8  detection    = 0;
             u16 distanceInCm = 0;
-            while (nsensors::readHMMD(&detection, &distanceInCm))
+            while (nsensors::readHMMD2(&detection, &distanceInCm))
             {
                 if (distanceInCm != gLastDistanceInCm)
                 {
                     gLastDistanceInCm = distanceInCm;
 
-                    // Serial.print("Presence: ");
-                    // Serial.println(detection ? "On" : "Off");
-                    // Serial.print("Distance: ");
-                    // Serial.print(distance);
-                    // Serial.println(" cm");
+                    nserial::print("Presence: ");
+                    nserial::println(detection ? "On" : "Off");
+                    nserial::print("Distance: ");
+                    char  distanceStrBuffer[16];
+                    str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+                    to_str(distanceStr, (s32)distanceInCm, 10);
+                    nserial::print(distanceStr.m_const);
+                    nserial::println(" cm");
 
                     // Write a custom (binary-format) network message
                     gSensorPacket.begin(gSequence++, kVersion);
@@ -138,7 +146,7 @@ void loop()
                     gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, detection);
                     gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distanceInCm);
                     gSensorPacket.finalize();
-                    nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                    // nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
                 }
             }
         }
