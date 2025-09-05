@@ -118,14 +118,16 @@ void loop()
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             // Read the HMMD sensor data
-            f32 fDistanceInCm = 0.0f;
-            if (nsensors::readHMMD(&fDistanceInCm))
+            u8 detection = 0;
+            u16 distanceInCm = 0;
+            while (nsensors::readHMMD(&detection, &distanceInCm))
             {
-                const s16 distanceInCm = static_cast<s16>(fDistanceInCm);  // Convert to integer centimeters
                 if (distanceInCm != gLastDistanceInCm)
                 {
                     gLastDistanceInCm = distanceInCm;
 
+                    // Serial.print("Presence: ");
+                    // Serial.println(detection ? "On" : "Off");
                     // Serial.print("Distance: ");
                     // Serial.print(distance);
                     // Serial.println(" cm");
@@ -133,7 +135,8 @@ void loop()
                     // Write a custom (binary-format) network message
                     gSensorPacket.begin(gSequence++, kVersion);
                     gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distance);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, detection);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distanceInCm);
                     gSensorPacket.finalize();
                     nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
                 }

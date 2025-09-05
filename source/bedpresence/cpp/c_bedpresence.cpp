@@ -5,15 +5,17 @@
 #include "rdno_core/c_linear_allocator.h"
 #include "rdno_core/c_dio.h"
 #include "rdno_core/c_adc.h"
-#include "rdno_wifi/c_wifi.h"
-#include "rdno_wifi/c_remote.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_str.h"
+#include "rdno_core/c_system.h"
+
+#include "rdno_wifi/c_wifi.h"
+#include "rdno_wifi/c_remote.h"
+#include "rdno_wifi/c_node.h"
 
 #include "bedpresence/c_network.secret.h"
-
-#include "Arduino.h"
 
 using namespace ncore;
 
