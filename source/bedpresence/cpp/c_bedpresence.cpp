@@ -15,61 +15,13 @@
 #include "rdno_wifi/c_remote.h"
 #include "rdno_wifi/c_node.h"
 
-#include "bedpresence/c_network.secret.h"
+#include "common/c_common.h"
 
 using namespace ncore;
 
 static ncore::linear_alloc_t gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t     gConfig;     // Configuration structure for non-volatile storage
 static u64                   gLastSensorReadTimeInMillis = 0;
-
-namespace ncore
-{
-    s16 key_to_index(str_t const& str)
-    {
-        s16 param_id = -1;
-        switch (str_len(str))
-        {
-            case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_SSID : -1; break;
-            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
-            case 7: param_id = str_eq_n(str, "ap_ssid", 7, false) ? nvstore::PARAM_ID_AP_SSID : -1; break;
-            case 11:
-                param_id = str_eq_n(str, "ap_password", 11, false) ? nvstore::PARAM_ID_AP_PASSWORD : -1;
-                param_id = param_id == -1 ? str_eq_n(str, "remote_port", 11, false) ? nvstore::PARAM_ID_REMOTE_PORT : -1 : param_id;
-                break;
-            case 13: param_id = str_eq_n(str, "remote_server", 13, false) ? nvstore::PARAM_ID_REMOTE_SERVER : -1; break;
-        }
-        if (param_id < 0)
-        {
-            s32 value = 0;
-            if (from_str(str, &value, 10) && value >= 0 && value < 256)
-            {
-                param_id = static_cast<s16>(value);
-            }
-        }
-        return param_id;
-    }
-
-    void setup_default_config(nvstore::config_t* config)
-    {
-        nvstore::reset(config);  // Reset the configuration to default values
-        const str_t ssid = str_const(WIFI_SSID);
-        const str_t pass = str_const(WIFI_PASSWORD);
-        nvstore::set_string(config, nvstore::PARAM_ID_SSID, ssid);
-        nvstore::set_string(config, nvstore::PARAM_ID_PASSWORD, pass);
-        char  ap_ssid_buffer[32];
-        str_t ap_ssid = str_mutable(ap_ssid_buffer, 32);
-        str_append(ap_ssid, "AirQuality-");
-        nsystem::get_unique_id(ap_ssid);
-        nvstore::set_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
-        const str_t ap_pass = str_const("32768");
-        nvstore::set_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_pass);
-        const str_t remote_server = str_const("192.168.8.88");
-        nvstore::set_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
-        const s32 remote_port = 31337;
-        nvstore::set_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
-    }
-}  // namespace ncore
 
 // TODO; we need a way to provide a 'logger', so that in the final build we can
 //       disable the serial output, and use a different method to log messages.
