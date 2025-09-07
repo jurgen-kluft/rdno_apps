@@ -121,7 +121,7 @@ void loop()
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             // Write a custom (binary-format) network message
-            gSensorPacket.begin(gSequence++, kVersion, SENSOR_LOCATION);
+            gSensorPacket.begin(gSequence, kVersion, SENSOR_LOCATION);
 
             // TODO whenever a sensor cannot be read (faulty?) we need to know so that we can
             //      mark the sensor as "error" in the sensor packet
@@ -245,6 +245,7 @@ void loop()
 
             if (gSensorPacket.finalize() > 0)
             {
+                gSequence++;  // Increment the sequence number for the next packet
                 nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
@@ -255,6 +256,12 @@ void loop()
     }
     else
     {
+        gLastSensorReadTimeInMillis = ntimer::millis();
+
+        gBme280LastReadInMillis = gLastSensorReadTimeInMillis;
+        gBh1750LastReadInMillis = gLastSensorReadTimeInMillis;
+        gScd41LastReadInMillis  = gLastSensorReadTimeInMillis;
+        
         // Not connected to WiFi
         // npin::write_pin(2, false);
     }

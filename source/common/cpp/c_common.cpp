@@ -14,11 +14,13 @@ namespace ncore
         switch (str_len(str))
         {
             case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_SSID : -1; break;
-            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
             case 7: param_id = str_eq_n(str, "ap_ssid", 7, false) ? nvstore::PARAM_ID_AP_SSID : -1; break;
+            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
             case 11:
-                param_id = str_eq_n(str, "ap_password", 11, false) ? nvstore::PARAM_ID_AP_PASSWORD : -1;
-                param_id = param_id == -1 ? str_eq_n(str, "remote_port", 11, false) ? nvstore::PARAM_ID_REMOTE_PORT : -1 : param_id;
+                if (str_eq_n(str, "ap_password", 11, false))
+                    param_id = nvstore::PARAM_ID_AP_PASSWORD;
+                else if (str_eq_n(str, "remote_port", 11, false))
+                    param_id = nvstore::PARAM_ID_REMOTE_PORT;
                 break;
             case 13: param_id = str_eq_n(str, "remote_server", 13, false) ? nvstore::PARAM_ID_REMOTE_SERVER : -1; break;
         }
@@ -53,4 +55,3 @@ namespace ncore
         nvstore::set_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
     }
 }  // namespace ncore
-
