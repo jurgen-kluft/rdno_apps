@@ -22,7 +22,9 @@ using namespace ncore;
 
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
-u64                      gLastSensorReadTimeInMillis = 0;
+
+#define SENSOR_LOCATION (nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1)
+u64 gLastSensorReadTimeInMillis = 0;
 
 void setup()
 {
@@ -92,12 +94,13 @@ void loop()
                     nserial::println(" cm");
 
                     // Write a custom (binary-format) network message
-                    gSensorPacket.begin(gSequence++, kVersion);
-                    gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::HMMD, nsensor::SensorState::On, detection);
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, nsensor::SensorModel::HMMD, nsensor::SensorState::On, distanceInCm);
-                    gSensorPacket.finalize();
-                    // nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                    gSensorPacket.begin(gSequence++, kVersion, SENSOR_LOCATION);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, detection);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, distanceInCm);
+                    if (gSensorPacket.finalize() > 0)
+                    {
+                        nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
+                    }
                 }
             }
         }

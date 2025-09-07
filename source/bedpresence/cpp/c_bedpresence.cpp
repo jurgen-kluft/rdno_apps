@@ -21,6 +21,8 @@ using namespace ncore;
 
 static ncore::linear_alloc_t gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t     gConfig;     // Configuration structure for non-volatile storage
+
+#define SENSOR_LOCATION (nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1)
 static u64                   gLastSensorReadTimeInMillis = 0;
 
 // TODO; we need a way to provide a 'logger', so that in the final build we can
@@ -76,7 +78,7 @@ void loop()
     if (nwifi::node_loop(&gConfig, ncore::key_to_index))
     {
         const u64 currentTimeInMillis = ntimer::millis();
-        if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 500)
+        if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 100)
         {
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
@@ -86,18 +88,20 @@ void loop()
             const s32 right_side          = nadc::analog_read(kRightSideGPIO);  // Read the right side sensor value
             const s32 right_side_presence = ToPresence(right_side);             // Convert the sensor value to voltage
 
-            if (left_side_presence != gLeftSidePresence || right_side_presence != gRightSidePresence)
+            // Write a custom (binary-format) network message
+            gSensorPacket.begin(gSequence++, kVersion, SENSOR_LOCATION);
+            if (left_side_presence != gLeftSidePresence)
             {
-                gLeftSidePresence  = left_side_presence;
+                gLeftSidePresence = left_side_presence;
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, left_side_presence);  // Write the left side sensor value
+            }
+            if (right_side_presence != gRightSidePresence)
+            {
                 gRightSidePresence = right_side_presence;
-                
-                // Write a custom (binary-format) network message
-                gSensorPacket.begin(gSequence++, kVersion);
-                gSensorPacket.write_info(nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1, nsensor::DeviceLabel::Presence);             // Write the header for the left side sensor
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, left_side_presence);   // Write the left side sensor value
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, nsensor::SensorModel::GPIO, nsensor::SensorState::On, right_side_presence);  // Write the left side sensor value
-                gSensorPacket.finalize();
-
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, right_side_presence);  // Write the left side sensor value
+            }
+            if (gSensorPacket.finalize() > 0)
+            {
                 nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }

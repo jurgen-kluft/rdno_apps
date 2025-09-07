@@ -15,11 +15,12 @@ Uses the following `rdno` libraries:
 
 During a specific time window (e.g., 10 PM to 6 AM), the device can enter a silent mode where it minimizes data transmission to conserve power and reduce noise. In this mode, the device can either stop sending data altogether or send data at a much lower frequency (e.g., every hour instead of every minute).
 
-info = 8 bytes, 7 sensor values = 24 bytes, total = 32 bytes
+info = 4 bytes, 7 sensor values = 17 bytes, total = 21 bytes, rounded up to 24 bytes (multiple of 4).
 
-e.g. one packet per second, size of one packet = 32 bytes:
-- per second = 32 bytes
-- per minute = 1.92 KB
-- per hour = 115.2 KB
-- 8 hours = 921.6 KB = 0.92 MB
-- per day = 2.76 MB
+e.g. one packet per second, size of one packet = 24 bytes:
+- per second = 24 bytes
+- per minute = 1.44 KB
+- per hour = 86.4 KB
+- 8 hours = 691.2 KB
+- per day = 2.06 MB
+
