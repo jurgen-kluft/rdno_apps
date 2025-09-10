@@ -89,7 +89,7 @@ void loop()
             const s32 right_side_presence = ToPresence(right_side);             // Convert the sensor value to voltage
 
             // Write a custom (binary-format) network message
-            gSensorPacket.begin(gSequence++, kVersion, SENSOR_LOCATION);
+            gSensorPacket.begin(gSequence++, kVersion);
             if (left_side_presence != gLeftSidePresence)
             {
                 gLeftSidePresence = left_side_presence;

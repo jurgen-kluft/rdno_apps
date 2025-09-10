@@ -13,9 +13,9 @@ namespace ncore
         s16 param_id = -1;
         switch (str_len(str))
         {
-            case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_SSID : -1; break;
+            case 4: param_id = str_eq_n(str, "ssid", 4, false) ? nvstore::PARAM_ID_WIFI_SSID : -1; break;
             case 7: param_id = str_eq_n(str, "ap_ssid", 7, false) ? nvstore::PARAM_ID_AP_SSID : -1; break;
-            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_PASSWORD : -1; break;
+            case 8: param_id = str_eq_n(str, "password", 8, false) ? nvstore::PARAM_ID_WIFI_PASSWORD : -1; break;
             case 11:
                 if (str_eq_n(str, "ap_password", 11, false))
                     param_id = nvstore::PARAM_ID_AP_PASSWORD;
@@ -40,8 +40,8 @@ namespace ncore
         nvstore::reset(config);  // Reset the configuration to default values
         const str_t ssid = str_const(WIFI_SSID);
         const str_t pass = str_const(WIFI_PASSWORD);
-        nvstore::set_string(config, nvstore::PARAM_ID_SSID, ssid);
-        nvstore::set_string(config, nvstore::PARAM_ID_PASSWORD, pass);
+        nvstore::set_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid);
+        nvstore::set_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass);
         char  ap_ssid_buffer[64];
         str_t ap_ssid = str_mutable(ap_ssid_buffer, sizeof(ap_ssid_buffer));
         str_append(ap_ssid, "HumanPresence-");
