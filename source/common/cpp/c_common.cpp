@@ -47,7 +47,7 @@ namespace ncore
         str_append(ap_ssid, "HumanPresence-");
         nsystem::get_unique_id(ap_ssid);
         nvstore::set_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
-        const str_t ap_pass = str_const("32768");
+        const str_t ap_pass = str_const("esp32768");
         nvstore::set_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_pass);
         const str_t remote_server = str_const(SERVER_IP);
         nvstore::set_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);

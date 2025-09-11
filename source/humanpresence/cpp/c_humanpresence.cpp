@@ -23,7 +23,6 @@ using namespace ncore;
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
-#define SENSOR_LOCATION (nsensor::DeviceLocation::Bedroom | nsensor::DeviceLocation::Location1)
 u64 gLastSensorReadTimeInMillis = 0;
 
 void setup()
@@ -94,7 +93,7 @@ void loop()
                     nserial::println(" cm");
 
                     // Write a custom (binary-format) network message
-                    gSensorPacket.begin(gSequence++, kVersion, SENSOR_LOCATION);
+                    gSensorPacket.begin(gSequence++, kVersion);
                     gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, detection);
                     gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, distanceInCm);
                     if (gSensorPacket.finalize() > 0)

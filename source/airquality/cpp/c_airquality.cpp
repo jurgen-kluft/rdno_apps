@@ -35,9 +35,9 @@ static u64               gLastSensorReadTimeInMillis = 0;
 #define ENABLE_BME280
 #define ENABLE_SCD41
 
-static u64 gBme280ReadPeriodInMillis = 60 * 1000;  // Frequency to read BME280 sensor (60 seconds)
-static u64 gBh1750ReadPeriodInMillis = 2 * 1000;   // Frequency to read BH1750 sensor (5 times per second)
-static u64 gScd41ReadPeriodInMillis  = 5 * 1000;   // Frequency to read SCD41 sensor (5 seconds)
+static u64 gBme280ReadPeriodInMillis = 60 * 1000;  // Frequency to read BME280 sensor (every 60 seconds)
+static u64 gBh1750ReadPeriodInMillis = 2 * 1000;   // Frequency to read BH1750 sensor (every 2 seconds)
+static u64 gScd41ReadPeriodInMillis  = 5 * 1000;   // Frequency to read SCD41 sensor (every 5 seconds)
 
 static u64 gBme280LastReadInMillis = 0;  // Frequency to read BME280 sensor (60 seconds)
 static u64 gBh1750LastReadInMillis = 0;  // Frequency to read BH1750 sensor (5 times per second)
@@ -63,7 +63,7 @@ void setup()
     gAllocator.setup(alloc_mem, alloc_size);             // Set up the linear allocator with the allocated memory
 
     // Initialize the WiFi node
-    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
+//    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
     {
         setup_default_config(&gConfig);  // Set up default configuration values
         nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
