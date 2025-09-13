@@ -23,11 +23,31 @@ using namespace ncore;
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
-u64 gLastSensorReadTimeInMillis = 0;
+u64                     gLastSensorReadTimeInMillis = 0;
+nsensor::SensorPacket_t gSensorPacket;                      // Sensor packet for sending data
+u16                     gSequence                 = 0;      // Sequence number for the packet
+const u8                kVersion                  = 1;      // Version number for the packet
+s16                     gLastDistanceInCm         = 32768;  // Last distance value read from the sensor
+s8                      gLastPresence             = 0;      // Last presence value read from the sensor
 
 void setup()
 {
     nserial::begin();  // Initialize serial communication at 115200 baud
+
+    if (nsystem::init_psram())  // Initialize PSRAM if available
+    {
+        nserial::println("PSRAM is available and initialized.");
+        
+        nserial::print("PSRAM size: ");
+        const s32 free_heap_size = (s32)nsystem::total_psram();
+        nserial::print(free_heap_size);
+        nserial::println("");
+
+        nserial::print("PSRAM free: ");
+        const s32 free_psram_size = (s32)nsystem::free_psram();
+        nserial::print(free_psram_size);
+        nserial::println("");
+    }
 
     const u32 alloc_size = 1024 * 8;
     byte*     alloc_mem  = nsystem::malloc(alloc_size);  // Allocate memory for the linear allocator
@@ -59,11 +79,6 @@ void setup()
     nserial::println("Setup done...");
 }
 
-nsensor::SensorPacket_t gSensorPacket;              // Sensor packet for sending data
-u16                     gSequence         = 0;      // Sequence number for the packet
-const u8                kVersion          = 1;      // Version number for the packet
-s16                     gLastDistanceInCm = 32768;  // Last distance value read from the sensor
-
 // Main loop of the application
 void loop()
 {
@@ -75,32 +90,53 @@ void loop()
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             // Read the HMMD sensor data
-            u8  detection    = 0;
-            u16 distanceInCm = 0;
-            while (nsensors::readHMMD2(&detection, &distanceInCm))
+            s8  presence     = gLastPresence;
+            u16 distanceInCm = gLastDistanceInCm;
+            s32 count        = 0;
+            while (nsensors::readHMMD2(&presence, &distanceInCm))
             {
-                if (distanceInCm != gLastDistanceInCm)
-                {
-                    gLastDistanceInCm = distanceInCm;
+#if 0
+                nserial::print("Read Presence: ");
+                nserial::println(presence == 1 ? "On" : "Off");
+                nserial::print("Read Distance: ");
+                char  distanceStrBuffer[16];
+                str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+                to_str(distanceStr, (s32)distanceInCm, 10);
+                nserial::print(distanceStr.m_const);
+                nserial::println(" cm");
+                nserial::print("Count = ");
+                nserial::print(count);
+                nserial::println("");
+                count++;
+#endif
+            }
 
-                    nserial::print("Presence: ");
-                    nserial::println(detection ? "On" : "Off");
-                    nserial::print("Distance: ");
-                    char  distanceStrBuffer[16];
-                    str_t distanceStr = str_mutable(distanceStrBuffer, 16);
-                    to_str(distanceStr, (s32)distanceInCm, 10);
-                    nserial::print(distanceStr.m_const);
-                    nserial::println(" cm");
+            // Write a custom (binary-format) network message
+            gSensorPacket.begin(gSequence++, kVersion);
+            if (presence != gLastPresence)
+            {
+                gLastPresence = presence;
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, presence);
+            }
+            if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != gLastDistanceInCm)
+            {
+                gLastDistanceInCm = distanceInCm;
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, distanceInCm);
+            }
 
-                    // Write a custom (binary-format) network message
-                    gSensorPacket.begin(gSequence++, kVersion);
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, detection);
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, distanceInCm);
-                    if (gSensorPacket.finalize() > 0)
-                    {
-                        nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
-                    }
-                }
+            if (gSensorPacket.finalize() > 0)
+            {
+#ifdef TARGET_DEBUG
+                nserial::print("Sending presence=");
+                nserial::print(presence == 1 ? "On" : "Off");
+                nserial::print(", distance=");
+                char  distanceStrBuffer[16];
+                str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+                to_str(distanceStr, (s32)distanceInCm, 10);
+                nserial::print(distanceStr.m_const);
+                nserial::println(" cm");
+#endif
+                nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
     }
