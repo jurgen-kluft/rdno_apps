@@ -18,6 +18,8 @@
 
 #include "rdno_sensors/c_hmmd.h"
 
+#include "Arduino.h"
+
 using namespace ncore;
 
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management

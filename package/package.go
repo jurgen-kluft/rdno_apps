@@ -40,9 +40,15 @@ func GetPackage() *denv.Package {
 	humanpresence.AddDependencies(sensorspkg.GetMainLib()...)
 	humanpresence.AddSharedSource("common")
 
+	magnet := denv.SetupCppAppProject(mainpkg, "magnet", "magnet")
+	magnet.AddDependencies(corepkg.GetMainLib()...)
+	magnet.AddDependencies(wifipkg.GetMainLib()...)
+	magnet.AddSharedSource("common")
+
 	mainpkg.AddMainApp(bedpresence)
 	mainpkg.AddMainApp(airquality)
 	mainpkg.AddMainApp(humanpresence)
+	mainpkg.AddMainApp(magnet)
 
 	return mainpkg
 }
