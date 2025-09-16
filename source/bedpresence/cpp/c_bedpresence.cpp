@@ -3,8 +3,7 @@
 
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
-#include "rdno_core/c_dio.h"
-#include "rdno_core/c_adc.h"
+#include "rdno_core/c_gpio.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
@@ -48,7 +47,7 @@ void setup()
     nwifi::node_setup(&gConfig, ncore::key_to_index);
 
     // This is where you would set up your hardware, peripherals, etc.
-    npin::set_pinmode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
+    ngpio::set_pinmode(2, ncore::ngpio::ModeOutput);  // Set the LED pin as output
 
     gLastSensorReadTimeInMillis = ntimer::millis();
 
@@ -82,10 +81,10 @@ void loop()
         {
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
-            const s32 left_side          = nadc::analog_read(kLeftSideGPIO);  // Read the left side sensor value
+            const s32 left_side          = ngpio::read_analog(kLeftSideGPIO);  // Read the left side sensor value
             const s32 left_side_presence = ToPresence(left_side);             // Convert the sensor value to voltage
 
-            const s32 right_side          = nadc::analog_read(kRightSideGPIO);  // Read the right side sensor value
+            const s32 right_side          = ngpio::read_analog(kRightSideGPIO);  // Read the right side sensor value
             const s32 right_side_presence = ToPresence(right_side);             // Convert the sensor value to voltage
 
             // Write a custom (binary-format) network message

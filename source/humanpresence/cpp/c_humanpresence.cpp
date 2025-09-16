@@ -2,8 +2,6 @@
 
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
-#include "rdno_core/c_dio.h"
-#include "rdno_core/c_adc.h"
 #include "rdno_wifi/c_wifi.h"
 #include "rdno_wifi/c_remote.h"
 #include "rdno_wifi/c_node.h"
@@ -17,8 +15,6 @@
 #include "common/c_common.h"
 
 #include "rdno_sensors/c_hmmd.h"
-
-#include "Arduino.h"
 
 using namespace ncore;
 

@@ -2,8 +2,7 @@
 
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
-#include "rdno_core/c_dio.h"
-#include "rdno_core/c_adc.h"
+#include "rdno_core/c_gpio.h"
 #include "rdno_wifi/c_wifi.h"
 #include "rdno_wifi/c_remote.h"
 #include "rdno_wifi/c_node.h"
@@ -42,7 +41,7 @@ void loop()
         const u64 currentTimeInMillis = ntimer::millis();
         if (currentTimeInMillis - gLastReadTimeInMillis >= 100)  // 10 times per second
         {
-            const s32 magnetValue = nadc::analog_read(0);  // Read the magnet sensor value from ADC pin 0
+            const s32 magnetValue = ngpio::read_analog(0);  // Read the magnet sensor value from ADC pin 0
             nserial::print("Magnet: ");
             nserial::print(magnetValue);  // Print the magnet value to the serial console
             nserial::println("");

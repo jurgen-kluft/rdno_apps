@@ -3,8 +3,7 @@
 
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
-#include "rdno_core/c_dio.h"
-#include "rdno_core/c_adc.h"
+#include "rdno_core/c_gpio.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_sensor_packet.h"
