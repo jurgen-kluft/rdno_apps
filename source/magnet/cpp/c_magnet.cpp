@@ -19,19 +19,30 @@ using namespace ncore;
 
 ncore::nvstore::config_t gConfig;                    // Configuration structure for non-volatile storage
 u64                      gLastReadTimeInMillis = 0;  // Last time the sensor was read
+const s8                 gMagnetPin            = 2;  // GPIO pin connected to the magnet sensor
 
 void setup()
 {
     nserial::begin();  // Initialize serial communication at 115200 baud
 
+    // Initialize the WiFi node
+    //    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
+    {
+        setup_default_config(&gConfig);  // Set up default configuration values
+        nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
+    }
+
+    // Initialize the WiFi node
     nserial::println("Node setup started...");
     nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
-    // npin::set_pinmode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
+    ngpio::set_pinmode(gMagnetPin, ncore::ngpio::ModeInput);  // Set D0 pin as input
 
     nserial::println("Setup done...");
 }
+
+s32 lastMagnetValue = 0;
 
 // Main loop of the application
 void loop()
@@ -41,11 +52,17 @@ void loop()
         const u64 currentTimeInMillis = ntimer::millis();
         if (currentTimeInMillis - gLastReadTimeInMillis >= 100)  // 10 times per second
         {
-            const s32 magnetValue = ngpio::read_analog(0);  // Read the magnet sensor value from ADC pin 0
-            nserial::print("Magnet: ");
-            nserial::print(magnetValue);  // Print the magnet value to the serial console
-            nserial::println("");
+            gLastReadTimeInMillis = currentTimeInMillis;
+            const s32 magnetValue = ngpio::read_analog(gMagnetPin);  // Read the magnet sensor
+            if (magnetValue != lastMagnetValue)
+            {
+                lastMagnetValue = magnetValue;
+                nserial::print("Magnet: ");
+                nserial::print(magnetValue);  // Print the magnet value to the serial console
+                nserial::println("");
+            }
         }
+        ntimer::delay(80);
     }
 }
 
