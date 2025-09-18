@@ -1,4 +1,3 @@
-
 #include "airquality/c_airquality.h"
 
 #include "rdno_core/c_malloc.h"
