@@ -13,13 +13,29 @@
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 
+#include "rdno_sensors/c_ys312.h"
+
 #include "common/c_common.h"
 
 using namespace ncore;
 
 ncore::nvstore::config_t gConfig;                    // Configuration structure for non-volatile storage
 u64                      gLastReadTimeInMillis = 0;  // Last time the sensor was read
-const s8                 gMagnetPin            = 2;  // GPIO pin connected to the magnet sensor
+
+//#define USE_MAGNET_SENSOR
+#define USE_PIR_SENSOR
+
+#ifdef USE_MAGNET_SENSOR
+const s8  gInputPin            = 2;  // GPIO pin connected to the magnet sensor
+const s32 gMagnetThreshold = 100;  // Threshold value for magnet detection, < 100 means magnet is closed, >= 100 means magnet is open
+s32 lastMagnetValue = -1;          // Last read value of the magnet sensor
+#endif
+
+#ifdef USE_PIR_SENSOR
+const s8  gInputPin            = 2;  // GPIO pin connected to the magnet sensor
+const s32 gPIRThreshold = 500;  // Threshold value for PIR detection, < 500 means no motion, >= 500 means motion detected
+s32 lastPIRValue = -1;          // Last read value of the PIR sensor
+#endif
 
 void setup()
 {
@@ -38,13 +54,10 @@ void setup()
     nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
-    ngpio::set_pinmode(gMagnetPin, ncore::ngpio::ModeInput);  // Set D0 pin as input
+    ngpio::set_pinmode(gInputPin, ncore::ngpio::ModeInput);  // Set D0 pin as input
 
     nserial::println("Setup done ...");
 }
-
-const s32 gMagnetThreshold = 100;  // Threshold value for magnet detection, < 100 means magnet is closed, >= 100 means magnet is open
-s32 lastMagnetValue = -1;          // Last read value of the magnet sensor
 
 // Main loop of the application
 void loop()
@@ -52,10 +65,12 @@ void loop()
     if (nwifi::node_loop(&gConfig, ncore::key_to_index))
     {
         const u64 currentTimeInMillis = ntimer::millis();
-        if (currentTimeInMillis - gLastReadTimeInMillis >= 100)  // 10 times per second
+        //if (currentTimeInMillis - gLastReadTimeInMillis >= 100)  // 10 times per second
         {
             gLastReadTimeInMillis = currentTimeInMillis;
-            const s32 magnetValue = ngpio::read_analog(gMagnetPin) < gMagnetThreshold ? 1 : 0;  // Read the magnet sensor
+
+#ifdef USE_MAGNET_SENSOR
+            const s32 magnetValue = ngpio::read_analog(gInputPin) < gMagnetThreshold ? 1 : 0;  // Read the magnet sensor
             if (magnetValue != lastMagnetValue)
             {
                 nserial::print("Magnet: ");
@@ -63,6 +78,18 @@ void loop()
                 nserial::println("");
                 lastMagnetValue = magnetValue;
             }
+#endif
+
+#ifdef USE_PIR_SENSOR
+            u16 pirValue = 0;
+            if (nsensors::nys312::read(gInputPin, &pirValue))
+            {
+                nserial::print("PIR: ");
+                nserial::print((u32)pirValue, false); 
+                nserial::println("");
+                lastPIRValue = pirValue;
+            }
+#endif
         }
         ntimer::delay(80);
     }

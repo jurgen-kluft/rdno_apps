@@ -1,4 +1,5 @@
 #include "rd03d/c_rd03d.h"
+#include "rdno_sensors/c_rd03d.h"
 
 #include "rdno_core/c_malloc.h"
 #include "rdno_core/c_linear_allocator.h"
@@ -36,11 +37,10 @@ void setup()
     nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
 
     // This is where you would set up your hardware, peripherals, etc.
+    nsensors::nrd03d::begin(20, 21);  // Initialize RD03D sensor with rx and tx pin
 
     nserial::println("Setup done...");
 }
-
-s32 lastMagnetValue = 0;
 
 // Main loop of the application
 void loop()
@@ -50,11 +50,34 @@ void loop()
         const u64 currentTimeInMillis = ntimer::millis();
         if (currentTimeInMillis - gLastReadTimeInMillis >= 100)  // 10 times per second
         {
-            gLastReadTimeInMillis = currentTimeInMillis;
+            if (nsensors::nrd03d::update())
+            {
+                gLastReadTimeInMillis = currentTimeInMillis;
 
-            
+                nsensors::nrd03d::target_t tgt = nsensors::nrd03d::getTarget();
+                
+                nserial::print("X (mm): ");
+                nserial::print((s32)tgt.x);
+                nserial::println("");
+
+                nserial::print("Y (mm): ");
+                nserial::print((s32)tgt.y);
+                nserial::println("");
+
+                nserial::print("Distance (mm): ");
+                nserial::print((s32)tgt.distance);
+                nserial::println("");
+
+                nserial::print("Angle (degrees): ");
+                nserial::print((s32)tgt.angle);
+                nserial::println("");
+
+                nserial::print("Speed (cm/s): ");
+                nserial::print((s32)tgt.speed);
+                nserial::println("");
+                nserial::println("-------------------------");
+            }
         }
-        ntimer::delay(80);
     }
 }
 
