@@ -22,7 +22,7 @@ ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
 u64                     gLastSensorReadTimeInMillis = 0;
-nsensor::SensorPacket_t gSensorPacket;                      // Sensor packet for sending data
+nsensor::sensorpacket_t gSensorPacket;                      // Sensor packet for sending data
 u16                     gSequence                 = 0;      // Sequence number for the packet
 const u8                kVersion                  = 1;      // Version number for the packet
 s16                     gLastDistanceInCm         = 32768;  // Last distance value read from the sensor
@@ -110,16 +110,16 @@ void loop()
             }
 
             // Write a custom (binary-format) network message
-            gSensorPacket.begin(gSequence++, kVersion);
+            gSensorPacket.begin((u32)nwifi::node_timesync(), false);
             if (presence != gLastPresence)
             {
                 gLastPresence = presence;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, presence);
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, (u64)presence);
             }
             if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != gLastDistanceInCm)
             {
                 gLastDistanceInCm = distanceInCm;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, distanceInCm);
+                gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, (u64)distanceInCm);
             }
 
             if (gSensorPacket.finalize() > 0)

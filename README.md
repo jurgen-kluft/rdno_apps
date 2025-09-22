@@ -11,6 +11,21 @@ Uses the following `rdno` libraries:
 - rdno_wifi
 - rdno_sensors
 
+## Overview
+
+- AirQuality (CO2, Temperature, Humidity, Pressure)
+  - Status: Working
+- BedPresence
+  - Status: Not working
+  - Need to think of a more clever way to detect bed occupancy
+- HumanPresence (mmWave, Distance)
+  - Status: Working
+- Magnet
+  - Status: Working
+- RD03D
+  - Status: Working 
+
+
 ## Silent Mode (WIP)
 
 During a specific time window (e.g., 10 PM to 6 AM), the device can enter a silent mode where it minimizes data transmission to conserve power and reduce noise. In this mode, the device can either stop sending data altogether or send data at a much lower frequency (e.g., every hour instead of every minute).

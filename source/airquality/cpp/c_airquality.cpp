@@ -93,8 +93,7 @@ void setup()
     nserial::println("Setup done...");
 }
 
-static nsensor::SensorPacket_t gSensorPacket;  // Sensor packet for sending data
-static u8                      gSequence = 0;  // Sequence number for the packet
+static nsensor::sensorpacket_t gSensorPacket;  // Sensor packet for sending data
 static const u8                kVersion  = 1;  // Version number for the packet
 
 static u16 gLastLux = 0;  // Last read light intensity value
@@ -119,7 +118,7 @@ void loop()
             gLastSensorReadTimeInMillis = currentTimeInMillis;
 
             // Write a custom (binary-format) network message
-            gSensorPacket.begin(gSequence, kVersion);
+            gSensorPacket.begin((u32)nwifi::node_timesync(), false);
 
             // TODO whenever a sensor cannot be read (faulty?) we need to know so that we can
             //      mark the sensor as "error" in the sensor packet
@@ -146,7 +145,7 @@ void loop()
                     nserial::print((u32)lux, false);
                     nserial::println(" lx");
 
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Light, lux);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Light, (u64)lux);
                 }
             }
 
@@ -176,7 +175,7 @@ void loop()
                     nserial::print("Temperature: ");
                     nserial::print((s32)bme_temp_s8);
                     nserial::println(" °C");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, bme_temp_s8);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, (u64)bme_temp_s8);
                 }
                 if (gLastBme_pres_u16 != bme_pres_u16)
                 {
@@ -184,7 +183,7 @@ void loop()
                     nserial::print("Pressure: ");
                     nserial::print((u32)bme_pres_u16, false);
                     nserial::println(" hPa");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Pressure, bme_pres_u16);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Pressure, (u64)bme_pres_u16);
                 }
                 if (gLastBme_humi_u8 != bme_humi_u8)
                 {
@@ -192,7 +191,7 @@ void loop()
                     nserial::print("Humidity: ");
                     nserial::print((u32)bme_humi_u8, false);
                     nserial::println(" %");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, bme_humi_u8);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, (u64)bme_humi_u8);
                 }
             }
 
@@ -221,7 +220,7 @@ void loop()
                     nserial::print("CO2: ");
                     nserial::print((u32)scd_co2, false);
                     nserial::println(" ppm");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::CO2, scd_co2);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::CO2, (u64)scd_co2);
                 }
                 if (gLastScd_temp_s8 != scd_temp_s8)
                 {
@@ -229,7 +228,7 @@ void loop()
                     nserial::print("SCD Temperature: ");
                     nserial::print((s32)scd_temp_s8, false);
                     nserial::println(" °C");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, scd_temp_s8);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, (u64)scd_temp_s8);
                 }
                 if (gLastScd_humi_u8 != scd_humi_u8)
                 {
@@ -237,13 +236,12 @@ void loop()
                     nserial::print("SCD Humidity: ");
                     nserial::print((u32)scd_humi_u8, false);
                     nserial::println(" %");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, scd_humi_u8);
+                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, (u64)scd_humi_u8);
                 }
             }
 
             if (gSensorPacket.finalize() > 0)
             {
-                gSequence++;                                             // Increment the sequence number for the next packet
                 nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
