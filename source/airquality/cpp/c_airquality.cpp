@@ -5,7 +5,7 @@
 #include "rdno_core/c_gpio.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
-#include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 #include "rdno_core/c_wire.h"
@@ -61,7 +61,7 @@ void setup()
     gAllocator.setup(alloc_mem, alloc_size);             // Set up the linear allocator with the allocated memory
 
     // Initialize the WiFi node
-//    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
+    //    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
     {
         setup_default_config(&gConfig);  // Set up default configuration values
         nvstore::save(&gConfig);         // Save the default configuration to non-volatile storage
@@ -93,8 +93,8 @@ void setup()
     nserial::println("Setup done...");
 }
 
-static nsensor::sensorpacket_t gSensorPacket;  // Sensor packet for sending data
-static const u8                kVersion  = 1;  // Version number for the packet
+static npacket::packet_t gSensorPacket;  // Sensor packet for sending data
+static const u8          kVersion = 1;   // Version number for the packet
 
 static u16 gLastLux = 0;  // Last read light intensity value
 
@@ -145,7 +145,7 @@ void loop()
                     nserial::print((u32)lux, false);
                     nserial::println(" lx");
 
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Light, (u64)lux);
+                    gSensorPacket.write_value(npacket::ntype::Light, (u64)lux);
                 }
             }
 
@@ -175,7 +175,7 @@ void loop()
                     nserial::print("Temperature: ");
                     nserial::print((s32)bme_temp_s8);
                     nserial::println(" °C");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, (u64)bme_temp_s8);
+                    gSensorPacket.write_value(npacket::ntype::Temperature, (u64)bme_temp_s8);
                 }
                 if (gLastBme_pres_u16 != bme_pres_u16)
                 {
@@ -183,7 +183,7 @@ void loop()
                     nserial::print("Pressure: ");
                     nserial::print((u32)bme_pres_u16, false);
                     nserial::println(" hPa");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Pressure, (u64)bme_pres_u16);
+                    gSensorPacket.write_value(npacket::ntype::Pressure, (u64)bme_pres_u16);
                 }
                 if (gLastBme_humi_u8 != bme_humi_u8)
                 {
@@ -191,7 +191,7 @@ void loop()
                     nserial::print("Humidity: ");
                     nserial::print((u32)bme_humi_u8, false);
                     nserial::println(" %");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, (u64)bme_humi_u8);
+                    gSensorPacket.write_value(npacket::ntype::Humidity, (u64)bme_humi_u8);
                 }
             }
 
@@ -220,7 +220,7 @@ void loop()
                     nserial::print("CO2: ");
                     nserial::print((u32)scd_co2, false);
                     nserial::println(" ppm");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::CO2, (u64)scd_co2);
+                    gSensorPacket.write_value(npacket::ntype::CO2, (u64)scd_co2);
                 }
                 if (gLastScd_temp_s8 != scd_temp_s8)
                 {
@@ -228,7 +228,7 @@ void loop()
                     nserial::print("SCD Temperature: ");
                     nserial::print((s32)scd_temp_s8, false);
                     nserial::println(" °C");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Temperature, (u64)scd_temp_s8);
+                    gSensorPacket.write_value(npacket::ntype::Temperature, (u64)scd_temp_s8);
                 }
                 if (gLastScd_humi_u8 != scd_humi_u8)
                 {
@@ -236,7 +236,7 @@ void loop()
                     nserial::print("SCD Humidity: ");
                     nserial::print((u32)scd_humi_u8, false);
                     nserial::println(" %");
-                    gSensorPacket.write_sensor_value(nsensor::SensorType::Humidity, (u64)scd_humi_u8);
+                    gSensorPacket.write_value(npacket::ntype::Humidity, (u64)scd_humi_u8);
                 }
             }
 

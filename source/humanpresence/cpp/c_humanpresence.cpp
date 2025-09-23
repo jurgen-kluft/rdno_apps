@@ -8,7 +8,7 @@
 #include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
-#include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 
@@ -21,12 +21,12 @@ using namespace ncore;
 ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
 ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
 
-u64                     gLastSensorReadTimeInMillis = 0;
-nsensor::sensorpacket_t gSensorPacket;                      // Sensor packet for sending data
-u16                     gSequence                 = 0;      // Sequence number for the packet
-const u8                kVersion                  = 1;      // Version number for the packet
-s16                     gLastDistanceInCm         = 32768;  // Last distance value read from the sensor
-s8                      gLastPresence             = 0;      // Last presence value read from the sensor
+u64               gLastSensorReadTimeInMillis = 0;
+npacket::packet_t gSensorPacket;              // Sensor packet for sending data
+u16               gSequence         = 0;      // Sequence number for the packet
+const u8          kVersion          = 1;      // Version number for the packet
+s16               gLastDistanceInCm = 32768;  // Last distance value read from the sensor
+s8                gLastPresence     = 0;      // Last presence value read from the sensor
 
 void setup()
 {
@@ -35,7 +35,7 @@ void setup()
     if (nsystem::init_psram())  // Initialize PSRAM if available
     {
         nserial::println("PSRAM is available and initialized.");
-        
+
         nserial::print("PSRAM size: ");
         const s32 free_heap_size = (s32)nsystem::total_psram();
         nserial::print(free_heap_size);
@@ -114,12 +114,12 @@ void loop()
             if (presence != gLastPresence)
             {
                 gLastPresence = presence;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, (u64)presence);
+                gSensorPacket.write_value(npacket::ntype::Presence, (u64)presence);
             }
             if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != gLastDistanceInCm)
             {
                 gLastDistanceInCm = distanceInCm;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Distance, (u64)distanceInCm);
+                gSensorPacket.write_value(npacket::ntype::Distance, (u64)distanceInCm);
             }
 
             if (gSensorPacket.finalize() > 0)

@@ -9,7 +9,7 @@
 #include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
-#include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 

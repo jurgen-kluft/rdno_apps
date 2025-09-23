@@ -6,7 +6,7 @@
 #include "rdno_core/c_gpio.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
-#include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 
@@ -65,7 +65,7 @@ const u8 kRightSideGPIO = 12;  // Pin number for the right side sensor
 // Formula: presence = (adc_value / ADC_STEPS)
 inline s32 ToPresence(s32 adc_value) { return (static_cast<float>(adc_value) * ADC_STEPS) * 65535.0f; }
 
-static nsensor::sensorpacket_t gSensorPacket;           // Sensor packet for sending data
+static npacket::packet_t gSensorPacket;           // Sensor packet for sending data
 static u16                     gSequence          = 0;  // Sequence number for the packet
 static const u8                kVersion           = 1;  // Version number for the packet
 static s32                     gLeftSidePresence  = 0;  // Presence value for the left side sensor
@@ -92,12 +92,12 @@ void loop()
             if (left_side_presence != gLeftSidePresence)
             {
                 gLeftSidePresence = left_side_presence;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, (u64)left_side_presence);  // Write the left side sensor value
+                gSensorPacket.write_value(npacket::ntype::Presence, (u64)left_side_presence);  // Write the left side sensor value
             }
             if (right_side_presence != gRightSidePresence)
             {
                 gRightSidePresence = right_side_presence;
-                gSensorPacket.write_sensor_value(nsensor::SensorType::Presence, (u64)right_side_presence);  // Write the left side sensor value
+                gSensorPacket.write_value(npacket::ntype::Presence, (u64)right_side_presence);  // Write the left side sensor value
             }
             if (gSensorPacket.finalize() > 0)
             {

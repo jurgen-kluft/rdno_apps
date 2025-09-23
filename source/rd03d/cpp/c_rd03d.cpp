@@ -10,7 +10,7 @@
 #include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
-#include "rdno_core/c_sensor_packet.h"
+#include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
 
@@ -54,28 +54,44 @@ void loop()
             {
                 gLastReadTimeInMillis = currentTimeInMillis;
 
-                nsensors::nrd03d::target_t tgt = nsensors::nrd03d::getTarget();
-                
-                nserial::print("X (mm): ");
-                nserial::print((s32)tgt.x);
-                nserial::println("");
+                nsensors::nrd03d::target_t tgt[3];
+                for (s8 i = 0; i < 3; ++i)
+                {
+                    nsensors::nrd03d::getTarget(i, tgt[i]);
+                }
 
-                nserial::print("Y (mm): ");
-                nserial::print((s32)tgt.y);
-                nserial::println("");
-
-                nserial::print("Distance (mm): ");
-                nserial::print((s32)tgt.distance);
-                nserial::println("");
-
-                nserial::print("Angle (degrees): ");
-                nserial::print((s32)tgt.angle);
-                nserial::println("");
-
-                nserial::print("Speed (cm/s): ");
-                nserial::print((s32)tgt.speed);
-                nserial::println("");
                 nserial::println("-------------------------");
+                nserial::print("X: ");
+                nserial::print((s32)tgt[0].x);
+                nserial::print(", ");
+                nserial::print((s32)tgt[1].x);
+                nserial::print(", ");
+                nserial::print((s32)tgt[2].x);
+                nserial::println("");
+
+                nserial::print("Y: ");
+                nserial::print((s32)tgt[0].y);
+                nserial::print(", ");
+                nserial::print((s32)tgt[1].y);
+                nserial::print(", ");
+                nserial::print((s32)tgt[2].y);
+                nserial::println("");
+
+                nserial::print("S: ");
+                nserial::print((s32)tgt[0].distance);
+                nserial::print(", ");
+                nserial::print((s32)tgt[1].distance);
+                nserial::print(", ");
+                nserial::print((s32)tgt[2].distance);
+                nserial::println("");
+
+                nserial::print("V: ");
+                nserial::print((s32)tgt[0].speed);
+                nserial::print(", ");
+                nserial::print((s32)tgt[1].speed);
+                nserial::print(", ");
+                nserial::print((s32)tgt[2].speed);
+                nserial::println("");
             }
         }
     }
