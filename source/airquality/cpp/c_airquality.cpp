@@ -33,13 +33,13 @@ static u64               gLastSensorReadTimeInMillis = 0;
 #define ENABLE_BME280
 #define ENABLE_SCD41
 
-static u64 gBme280ReadPeriodInMillis = 60 * 1000;  // Frequency to read BME280 sensor (every 60 seconds)
-static u64 gBh1750ReadPeriodInMillis = 2 * 1000;   // Frequency to read BH1750 sensor (every 2 seconds)
-static u64 gScd41ReadPeriodInMillis  = 5 * 1000;   // Frequency to read SCD41 sensor (every 5 seconds)
+static u64 gBme280ReadPeriodInMillis = 300 * 1000;  // Frequency to read BME280 sensor (every 5 minutes)
+static u64 gBh1750ReadPeriodInMillis = 300 * 1000;   // Frequency to read BH1750 sensor (every 5 minutes)
+static u64 gScd41ReadPeriodInMillis  = 300 * 1000;   // Frequency to read SCD41 sensor (every 5 minutes)
 
-static u64 gBme280LastReadInMillis = 0;  // Frequency to read BME280 sensor (60 seconds)
-static u64 gBh1750LastReadInMillis = 0;  // Frequency to read BH1750 sensor (5 times per second)
-static u64 gScd41LastReadInMillis  = 0;  // Frequency to read SCD41 sensor (5 seconds)
+static u64 gBme280LastReadInMillis = 0;  // Last read BME280 sensor 
+static u64 gBh1750LastReadInMillis = 0;  // Last read BH1750 sensor 
+static u64 gScd41LastReadInMillis  = 0;  // Last read SCD41 sensor 
 
 static bool trigger_read(const u64 currentTimeInMillis, u64& lastReadInMillis, const u64 readPeriodInMillis)
 {
