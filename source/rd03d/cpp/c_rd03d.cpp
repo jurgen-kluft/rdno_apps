@@ -33,14 +33,17 @@ namespace ncore
             // This is where you would set up your hardware, peripherals, etc.
             nsensors::nrd03d::begin(20, 21);  // Initialize RD03D sensor with rx and tx pin
 
+            nserial::println("Setup main program...");
+
             // the main program to execute sensor reading
-            ntask::program_t main_program = program(exec);
-            xbegin(exec, main_program);
+            ntask::program_t main_program = ntask::program(exec);
+            ntask::xbegin(exec, main_program);
             {
-                xrun_periodic(exec, app_main, 100);  // every 100 ms
-                xreturn(exec);
+                ntask::xrun_periodic(exec, app_main, 100);  // every 100 ms
             }
-            xend(exec);
+            ntask::xend(exec);
+
+            nserial::println("Setup node...");
 
             nnode::connected(exec, main_program, state);
 
@@ -55,18 +58,21 @@ namespace ncore
     {
         ncore::state_app_t* appState = state->app;
 
-        nsensors::nrd03d::target_t tgt[3];
-        for (s8 i = 0; i < 3; ++i)
+        if (nsensors::nrd03d::update())
         {
-            nsensors::nrd03d::getTarget(i, tgt[i]);
+            nsensors::nrd03d::target_t tgt[3];
+            for (s8 i = 0; i < 3; ++i)
+            {
+                nsensors::nrd03d::getTarget(i, tgt[i]);
+            }
+
+            nserial::println("-------------------------");
+            nserial::printf("X: %d, %d, %d\n", va_t((s32)tgt[0].x), va_t((s32)tgt[1].x), va_t((s32)tgt[2].x));
+            nserial::printf("Y: %d, %d, %d\n", va_t((s32)tgt[0].y), va_t((s32)tgt[1].y), va_t((s32)tgt[2].y));
+            nserial::printf("S: %d, %d, %d\n", va_t((s32)tgt[0].distance), va_t((s32)tgt[1].distance), va_t((s32)tgt[2].distance));
+            nserial::printf("V: %d, %d, %d\n", va_t((s32)tgt[0].speed), va_t((s32)tgt[1].speed), va_t((s32)tgt[2].speed));
         }
-
-        nserial::println("-------------------------");
-        nserial::printf("X: %d, %d, %d\n", va_t((s32)tgt[0].x), va_t((s32)tgt[1].x), va_t((s32)tgt[2].x));
-        nserial::printf("Y: %d, %d, %d\n", va_t((s32)tgt[0].y), va_t((s32)tgt[1].y), va_t((s32)tgt[2].y));
-        nserial::printf("S: %d, %d, %d\n", va_t((s32)tgt[0].distance), va_t((s32)tgt[1].distance), va_t((s32)tgt[2].distance));
-        nserial::printf("V: %d, %d, %d\n", va_t((s32)tgt[0].speed), va_t((s32)tgt[1].speed), va_t((s32)tgt[2].speed));
-
+        
         return ntask::RESULT_OK;
     }
 }  // namespace ncore
