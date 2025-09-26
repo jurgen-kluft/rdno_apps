@@ -59,11 +59,11 @@ namespace ncore
         appState->gSensorPacket.begin((u32)state->time_ms, false);
 
         // TODO whenever a sensor cannot be read (faulty?) we need to know so that we can
-        //      mark the sensor as "error" in the sensor packet
+        //      send a 'state' packet that indicates the sensor is not working.
 
         // Read the BH1750 sensor data
-        u16 lux = 0;
 #ifdef ENABLE_BH1750
+        u16 lux = 0;
         if (nsensors::updateBH1750(lux))
         {
             if (appState->gLastLux != lux)
@@ -75,15 +75,13 @@ namespace ncore
         }
 #endif
 
+#ifdef ENABLE_BME280
         // Read the BME280 sensor data
         f32 bme_temp = 0.0f;
         f32 bme_pres = 0.0f;
         f32 bme_humi = 0.0f;
-#ifdef ENABLE_BME280
         const bool valid_bme280 = nsensors::updateBME280(bme_pres, bme_temp, bme_humi);
-#else
-        const bool valid_bme280 = false;
-#endif
+
         const s8  bme_temp_s8  = static_cast<s8>(bme_temp);   // Temperature to one signed byte (°C)
         const u16 bme_pres_u16 = static_cast<u16>(bme_pres);  // Pressure to unsigned short (hPa)
         const u8  bme_humi_u8  = static_cast<u8>(bme_humi);   // Humidity to one unsigned byte (%)
@@ -109,16 +107,15 @@ namespace ncore
                 appState->gSensorPacket.write_value(npacket::ntype::Humidity, (u64)bme_humi_u8);
             }
         }
+#endif
 
+#ifdef ENABLE_SCD41
         // Read the SCD41 sensor data
         f32 scd_humi = 0.0f;  // Initialize humidity value for SCD41
         f32 scd_temp = 0.0f;  // Initialize temperature value for SCD41
         u16 scd_co2  = 0;     // Initialize CO2 value
-#ifdef ENABLE_SCD41
         const bool valid_scd41 = nsensors::updateSCD41(scd_humi, scd_temp, scd_co2);
-#else
-        const bool valid_scd41 = false;
-#endif
+
         const s8 scd_temp_s8 = static_cast<s8>(scd_temp);  // Temperature to one signed byte (°C)
         const u8 scd_humi_u8 = static_cast<u8>(scd_humi);  // Humidity to one unsigned byte (%)
 
@@ -143,6 +140,7 @@ namespace ncore
                 appState->gSensorPacket.write_value(npacket::ntype::Humidity, (u64)scd_humi_u8);
             }
         }
+#endif
 
         if (appState->gSensorPacket.finalize() > 0)
         {
