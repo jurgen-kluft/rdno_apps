@@ -23,11 +23,6 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(sensorspkg)
 
 	// Setup the main applications
-	bedpresence := denv.SetupCppAppProject(mainpkg, "bedpresence", "bedpresence")
-	bedpresence.AddDependencies(corepkg.GetMainLib()...)
-	bedpresence.AddDependencies(wifipkg.GetMainLib()...)
-	bedpresence.AddSharedSource("common")
-
 	airquality := denv.SetupCppAppProject(mainpkg, "airquality", "airquality")
 	airquality.AddDependencies(corepkg.GetMainLib()...)
 	airquality.AddDependencies(wifipkg.GetMainLib()...)
@@ -52,7 +47,6 @@ func GetPackage() *denv.Package {
 	rd03d.AddDependencies(sensorspkg.GetMainLib()...)
 	rd03d.AddSharedSource("common")
 
-	mainpkg.AddMainApp(bedpresence)
 	mainpkg.AddMainApp(airquality)
 	mainpkg.AddMainApp(humanpresence)
 	mainpkg.AddMainApp(magnet)

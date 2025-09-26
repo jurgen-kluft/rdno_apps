@@ -1,7 +1,8 @@
 #include "humanpresence/c_humanpresence.h"
 
+#include "rdno_core/c_app.h"
+#include "rdno_core/c_config.h"
 #include "rdno_core/c_malloc.h"
-#include "rdno_core/c_linear_allocator.h"
 #include "rdno_wifi/c_wifi.h"
 #include "rdno_wifi/c_remote.h"
 #include "rdno_wifi/c_node.h"
@@ -11,134 +12,117 @@
 #include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
+#include "rdno_core/c_task.h"
 
 #include "common/c_common.h"
 
 #include "rdno_sensors/c_hmmd.h"
 
-using namespace ncore;
-
-ncore::linear_alloc_t    gAllocator;  // Linear allocator for memory management
-ncore::nvstore::config_t gConfig;     // Configuration structure for non-volatile storage
-
-u64               gLastSensorReadTimeInMillis = 0;
-npacket::packet_t gSensorPacket;              // Sensor packet for sending data
-u16               gSequence         = 0;      // Sequence number for the packet
-const u8          kVersion          = 1;      // Version number for the packet
-s16               gLastDistanceInCm = 32768;  // Last distance value read from the sensor
-s8                gLastPresence     = 0;      // Last presence value read from the sensor
-
-void setup()
+namespace ncore
 {
-    nserial::begin();  // Initialize serial communication at 115200 baud
-
-    if (nsystem::init_psram())  // Initialize PSRAM if available
+    struct state_app_t
     {
-        nserial::println("PSRAM is available and initialized.");
+        u64               gLastSensorReadTimeInMillis = 0;
+        npacket::packet_t gSensorPacket;              // Sensor packet for sending data
+        u16               gSequence         = 0;      // Sequence number for the packet
+        const u8          kVersion          = 1;      // Version number for the packet
+        s16               gLastDistanceInCm = 32768;  // Last distance value read from the sensor
+        s8                gLastPresence     = 0;      // Last presence value read from the sensor
+    };
 
-        nserial::print("PSRAM size: ");
-        const s32 free_heap_size = (s32)nsystem::total_psram();
-        nserial::print(free_heap_size);
-        nserial::println("");
+    state_app_t gAppState;
+}  // namespace ncore
 
-        nserial::print("PSRAM free: ");
-        const s32 free_psram_size = (s32)nsystem::free_psram();
-        nserial::print(free_psram_size);
-        nserial::println("");
-    }
-
-    const u32 alloc_size = 1024 * 8;
-    byte*     alloc_mem  = nsystem::malloc(alloc_size);  // Allocate memory for the linear allocator
-    gAllocator.setup(alloc_mem, alloc_size);             // Set up the linear allocator with the allocated memory
-
-    // Initialize the sensors
-    const u8 rx = 15;            // RX pin for HMMD
-    const u8 tx = 16;            // TX pin for HMMD
-    nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
-
-    // Initialize the WiFi node
-    nserial::println("Load config from non-volatile memory.");
-    if (!nvstore::load(&gConfig))  // Load configuration from non-volatile storage
-    {
-        nserial::println("Initializing default config.");
-        setup_default_config(&gConfig);  // Set up default configuration values
-        nserial::println("Saving config to non-volatile memory.");
-        nvstore::save(&gConfig);  // Save the default configuration to non-volatile storage
-    }
-
-    nserial::println("Node setup started...");
-    nwifi::node_setup(&gConfig, ncore::key_to_index);  // Set up the WiFi node with the configuration
-
-    // This is where you would set up your hardware, peripherals, etc.
-    // npin::SetPinMode(2, ncore::npin::ModeOutput);  // Set the LED pin as output
-
-    gLastSensorReadTimeInMillis = ntimer::millis();
-
-    nserial::println("Setup done...");
-}
-
-// Main loop of the application
-void loop()
+namespace ncore
 {
-    if (nwifi::node_loop(&gConfig, ncore::key_to_index))
+    ntask::result_t app_main(ntask::state_t* state);
+
+    namespace napp
     {
-        const u64 currentTimeInMillis = ntimer::millis();
-        if (currentTimeInMillis - gLastSensorReadTimeInMillis >= 100)  // 10 times per second
+        void setup(ntask::executor_t* exec, ntask::state_t* state)
         {
-            gLastSensorReadTimeInMillis = currentTimeInMillis;
+            state->app = &gAppState;
 
-            // Read the HMMD sensor data
-            s8  presence     = gLastPresence;
-            u16 distanceInCm = gLastDistanceInCm;
-            s32 count        = 0;
-            while (nsensors::readHMMD2(&presence, &distanceInCm))
-            {
-#if 0
-                nserial::print("Read Presence: ");
-                nserial::println(presence == 1 ? "On" : "Off");
-                nserial::print("Read Distance: ");
-                char  distanceStrBuffer[16];
-                str_t distanceStr = str_mutable(distanceStrBuffer, 16);
-                to_str(distanceStr, (s32)distanceInCm, 10);
-                nserial::print(distanceStr.m_const);
-                nserial::println(" cm");
-                nserial::print("Count = ");
-                nserial::print(count);
-                nserial::println("");
-                count++;
-#endif
-            }
+            // Initialize the sensors
+            const u8 rx = 15;            // RX pin for HMMD
+            const u8 tx = 16;            // TX pin for HMMD
+            nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
 
-            // Write a custom (binary-format) network message
-            gSensorPacket.begin((u32)nwifi::node_timesync(), false);
-            if (presence != gLastPresence)
+            // the main program to execute sensor reading
+            ntask::program_t main_program = program(exec);
+            xbegin(exec, main_program);
             {
-                gLastPresence = presence;
-                gSensorPacket.write_value(npacket::ntype::Presence, (u64)presence);
+                xrun_periodic(exec, app_main, 100);  // every 100 ms
+                xreturn(exec);
             }
-            if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != gLastDistanceInCm)
-            {
-                gLastDistanceInCm = distanceInCm;
-                gSensorPacket.write_value(npacket::ntype::Distance, (u64)distanceInCm);
-            }
+            xend(exec);
 
-            if (gSensorPacket.finalize() > 0)
-            {
-#ifdef TARGET_DEBUG
-                nserial::print("Sending presence=");
-                nserial::print(presence == 1 ? "On" : "Off");
-                nserial::print(", distance=");
-                char  distanceStrBuffer[16];
-                str_t distanceStr = str_mutable(distanceStrBuffer, 16);
-                to_str(distanceStr, (s32)distanceInCm, 10);
-                nserial::print(distanceStr.m_const);
-                nserial::println(" cm");
-#endif
-                nremote::write(gSensorPacket.Data, gSensorPacket.Size);  // Send the sensor packet to the server
-            }
+            nnode::connected(exec, main_program, state);
+
+            nserial::println("Setup done...");
         }
+    }  // namespace napp
+}  // namespace ncore
+
+namespace ncore
+{
+    ntask::result_t app_main(ntask::state_t* state)
+    {
+        ncore::state_app_t* appState = state->app;
+
+        // Read the HMMD sensor data
+        s8  presence     = appState->gLastPresence;
+        u16 distanceInCm = appState->gLastDistanceInCm;
+        s32 count        = 0;
+        while (nsensors::readHMMD2(&presence, &distanceInCm))
+        {
+#if 0
+            nserial::print("Read Presence: ");
+            nserial::println(presence == 1 ? "On" : "Off");
+            nserial::print("Read Distance: ");
+            char  distanceStrBuffer[16];
+            str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+            to_str(distanceStr, (s32)distanceInCm, 10);
+            nserial::print(distanceStr.m_const);
+            nserial::println(" cm");
+            nserial::print("Count = ");
+            nserial::print(count);
+            nserial::println("");
+            count++;
+#endif
+        }
+
+        // Write a custom (binary-format) network message
+        appState->gSensorPacket.begin((u32)(state->time_ms - state->time_sync), false);
+        if (presence != appState->gLastPresence)
+        {
+            appState->gLastPresence = presence;
+            appState->gSensorPacket.write_value(npacket::ntype::Presence, (u64)presence);
+        }
+        if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != appState->gLastDistanceInCm)
+        {
+            appState->gLastDistanceInCm = distanceInCm;
+            appState->gSensorPacket.write_value(npacket::ntype::Distance, (u64)distanceInCm);
+        }
+
+        if (appState->gSensorPacket.finalize() > 0)
+        {
+#ifdef TARGET_DEBUG
+            nserial::print("Sending presence=");
+            nserial::print(presence == 1 ? "On" : "Off");
+            nserial::print(", distance=");
+            char  distanceStrBuffer[16];
+            str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+            to_str(distanceStr, (s32)distanceInCm, 10);
+            nserial::print(distanceStr.m_const);
+            nserial::println(" cm");
+#endif
+            nremote::write(appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+        }
+
+        return ntask::RESULT_OK;
     }
-}
+}  // namespace ncore
 
 #ifndef TARGET_ESP32
 
