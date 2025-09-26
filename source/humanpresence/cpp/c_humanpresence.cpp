@@ -49,7 +49,7 @@ namespace ncore
             nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
 
             // the main program to execute sensor reading
-            ntask::program_t main_program = program(exec);
+            ntask::program_t main_program = program(exec, "human presence main program");
             xbegin(exec, main_program);
             {
                 xrun_periodic(exec, app_main, 100);  // every 100 ms
@@ -97,12 +97,12 @@ namespace ncore
         if (presence != appState->gLastPresence)
         {
             appState->gLastPresence = presence;
-            appState->gSensorPacket.write_value(npacket::ntype::Presence, (u64)presence);
+            appState->gSensorPacket.write_value(npacket::ntype::Presence1, (u64)presence);
         }
         if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != appState->gLastDistanceInCm)
         {
             appState->gLastDistanceInCm = distanceInCm;
-            appState->gSensorPacket.write_value(npacket::ntype::Distance, (u64)distanceInCm);
+            appState->gSensorPacket.write_value(npacket::ntype::Distance1, (u64)distanceInCm);
         }
 
         if (appState->gSensorPacket.finalize() > 0)

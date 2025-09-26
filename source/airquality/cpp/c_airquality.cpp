@@ -170,7 +170,7 @@ namespace ncore
 #endif
 
             // the main program to execute sensor reading
-            ntask::program_t main_program = program(exec);
+            ntask::program_t main_program = program(exec, "airquality main program");
             xbegin(exec, main_program);
             {
                 xrun_periodic(exec, app_main, 100);  // every 100 ms

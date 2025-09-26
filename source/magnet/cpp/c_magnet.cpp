@@ -53,7 +53,7 @@ namespace ncore
             ngpio::set_pinmode(gAppState.m_input_pin, ncore::ngpio::ModeInput);  // Set D0 pin as input
 
             // the main program to execute sensor reading
-            ntask::program_t main_program = program(exec);
+            ntask::program_t main_program = program(exec, "magnet main program");
             xbegin(exec, main_program);
             {
                 xrun_periodic(exec, app_main, 100);  // every 100 ms
