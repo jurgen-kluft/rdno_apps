@@ -93,16 +93,22 @@ namespace ncore
         }
 
         // Write a custom (binary-format) network message
-        appState->gSensorPacket.begin((u32)(state->time_ms - state->time_sync), false);
+        appState->gSensorPacket.begin();
         if (presence != appState->gLastPresence)
         {
+            u8 id;
+            nconfig::get_uint8(state->config, nconfig::PARAM_ID_P1, id);
+
             appState->gLastPresence = presence;
-            appState->gSensorPacket.write_value(npacket::ntype::Presence1, (u64)presence);
+            appState->gSensorPacket.write_sensor(id, nsensor_type::Presence1, (u64)presence);
         }
         if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != appState->gLastDistanceInCm)
         {
+            u8 id;
+            nconfig::get_uint8(state->config, nconfig::PARAM_ID_D1, id);
+
             appState->gLastDistanceInCm = distanceInCm;
-            appState->gSensorPacket.write_value(npacket::ntype::Distance1, (u64)distanceInCm);
+            appState->gSensorPacket.write_sensor(id, nsensor_type::Distance1, (u64)distanceInCm);
         }
 
         if (appState->gSensorPacket.finalize() > 0)
