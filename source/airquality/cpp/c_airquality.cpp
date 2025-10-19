@@ -73,7 +73,7 @@ namespace ncore
 
                 appState->gLastLux = lux;
                 nserial::printf("Light: %d lx\n", va_t((u32)lux));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Light, (u64)lux);
+                appState->gSensorPacket.write_sensor(id, lux);
             }
         }
 #endif
@@ -98,7 +98,7 @@ namespace ncore
 
                 appState->gLastBme_temp_s8 = bme_temp_s8;
                 nserial::printf("Temperature: %d °C\n", va_t((s32)bme_temp_s8));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Temperature, (u64)bme_temp_s8);
+                appState->gSensorPacket.write_sensor(id, (u16)bme_temp_s8);
             }
             if (appState->gLastBme_pres_u16 != bme_pres_u16)
             {
@@ -107,7 +107,7 @@ namespace ncore
 
                 appState->gLastBme_pres_u16 = bme_pres_u16;
                 nserial::printf("Pressure: %d hPa\n", va_t((u32)bme_pres_u16));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Pressure, (u64)bme_pres_u16);
+                appState->gSensorPacket.write_sensor(id, (u16)bme_pres_u16);
             }
             if (appState->gLastBme_humi_u8 != bme_humi_u8)
             {
@@ -116,7 +116,7 @@ namespace ncore
 
                 appState->gLastBme_humi_u8 = bme_humi_u8;
                 nserial::printf("Humidity: %d %%\n", va_t((u32)bme_humi_u8));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Humidity, (u64)bme_humi_u8);
+                appState->gSensorPacket.write_sensor(id, (u16)bme_humi_u8);
             }
         }
 #endif
@@ -140,7 +140,7 @@ namespace ncore
 
                 appState->gLastScd_co2 = scd_co2;
                 nserial::printf("SCD CO2: %d ppm\n", va_t((u32)scd_co2));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::CO2, (u64)scd_co2);
+                appState->gSensorPacket.write_sensor(id, (u16)scd_co2);
             }
             if (appState->gLastScd_temp_s8 != scd_temp_s8)
             {
@@ -149,7 +149,7 @@ namespace ncore
 
                 appState->gLastScd_temp_s8 = scd_temp_s8;
                 nserial::printf("SCD Temperature: %d °C\n", va_t((s32)scd_temp_s8));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Temperature, (u64)scd_temp_s8);
+                appState->gSensorPacket.write_sensor(id, (u16)scd_temp_s8);
             }
             if (appState->gLastScd_humi_u8 != scd_humi_u8)
             {
@@ -158,7 +158,7 @@ namespace ncore
 
                 appState->gLastScd_humi_u8 = scd_humi_u8;
                 nserial::printf("SCD Humidity: %d %%\n", va_t((u32)scd_humi_u8));
-                appState->gSensorPacket.write_sensor(id, nsensor_type::Humidity, (u64)scd_humi_u8);
+                appState->gSensorPacket.write_sensor(id, (u16)scd_humi_u8);
             }
         }
 #endif

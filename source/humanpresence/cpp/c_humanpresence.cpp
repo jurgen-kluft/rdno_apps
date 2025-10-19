@@ -100,7 +100,7 @@ namespace ncore
             nconfig::get_uint8(state->config, nconfig::PARAM_ID_P1, id);
 
             appState->gLastPresence = presence;
-            appState->gSensorPacket.write_sensor(id, nsensor_type::Presence1, (u64)presence);
+            appState->gSensorPacket.write_sensor(id, (u16)presence);
         }
         if ((distanceInCm > 0 && distanceInCm < 2000) && distanceInCm != appState->gLastDistanceInCm)
         {
@@ -108,7 +108,7 @@ namespace ncore
             nconfig::get_uint8(state->config, nconfig::PARAM_ID_D1, id);
 
             appState->gLastDistanceInCm = distanceInCm;
-            appState->gSensorPacket.write_sensor(id, nsensor_type::Distance1, (u64)distanceInCm);
+            appState->gSensorPacket.write_sensor(id, (u16)distanceInCm);
         }
 
         if (appState->gSensorPacket.finalize() > 0)
