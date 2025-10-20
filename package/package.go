@@ -23,22 +23,22 @@ func GetPackage() *denv.Package {
 	airquality := denv.SetupCppAppProject(mainpkg, "airquality", "airquality")
 	airquality.AddDependencies(wifipkg.GetMainLib())
 	airquality.AddDependencies(sensorspkg.GetMainLib())
-	airquality.AddCppSource("common")
+	airquality.AddSourceFiles("common", ".cpp")
 
 	humanpresence := denv.SetupCppAppProject(mainpkg, "humanpresence", "humanpresence")
 	humanpresence.AddDependencies(wifipkg.GetMainLib())
 	humanpresence.AddDependencies(sensorspkg.GetMainLib())
-	humanpresence.AddCppSource("common")
+	humanpresence.AddSourceFiles("common", ".cpp")
 
 	magnet := denv.SetupCppAppProject(mainpkg, "magnet", "magnet")
 	magnet.AddDependencies(wifipkg.GetMainLib())
 	magnet.AddDependencies(sensorspkg.GetMainLib())
-	magnet.AddCppSource("common")
+	magnet.AddSourceFiles("common", ".cpp")
 
 	rd03d := denv.SetupCppAppProject(mainpkg, "rd03d", "rd03d")
 	rd03d.AddDependencies(wifipkg.GetMainLib())
 	rd03d.AddDependencies(sensorspkg.GetMainLib())
-	rd03d.AddCppSource("common")
+	rd03d.AddSourceFiles("common", ".cpp")
 
 	mainpkg.AddMainApp(airquality)
 	mainpkg.AddMainApp(humanpresence)
