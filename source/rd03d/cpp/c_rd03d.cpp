@@ -30,11 +30,11 @@ namespace ncore
         program_t create_main_program(ntask::executor_t* exec)
         {
             program_t main_program = program(exec, "rd03d main program");
-            xbegin(exec, main_program);
+            op_begin(exec, main_program);
             {
-                xrun_periodic(exec, app_main, 100);  // every 100 ms
+                op_run_periodic(exec, app_main, 100);  // every 100 ms
             }
-            xend(exec);
+            op_end(exec);
             return main_program;
         }
     }  // namespace ntask
@@ -49,7 +49,7 @@ namespace ncore
             nsensors::nrd03d::begin(20, 21);
 
             ntask::program_t main_program = ntask::create_main_program(exec);
-            nnode::connected(exec, main_program, state);
+            nnode::initialize(exec, main_program, state);
         }
     }  // namespace napp
 }  // namespace ncore
@@ -73,12 +73,9 @@ namespace ncore
             // nserial::printf("Y: %d, %d, %d\n", va_t((s32)tgt[0].y), va_t((s32)tgt[1].y), va_t((s32)tgt[2].y));
             // nserial::printf("S: %d, %d, %d\n", va_t((s32)tgt[0].s), va_t((s32)tgt[1].s), va_t((s32)tgt[2].s));
 
-            // A sensor packet size for 3 targets
-            // 8 byte header
-            // x, 3 * 4 bytes = 12 bytes
-            // y, 3 * 4 bytes = 12 bytes
-            // distance, 3 * 4 bytes = 12 bytes
-            // total = 44 bytes
+            // A sensor packet size for max 3 targets
+            // x=s16, y=s16, z=s16 = 9 bytes
+            // total = 2 + 3*9 = 29 bytes
         }
 
         return ntask::RESULT_OK;

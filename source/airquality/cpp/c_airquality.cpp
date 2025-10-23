@@ -9,7 +9,7 @@
 #include "rdno_core/c_system.h"
 #include "rdno_core/c_wire.h"
 
-#include "rdno_wifi/c_remote.h"
+#include "rdno_wifi/c_tcp.h"
 #include "rdno_wifi/c_node.h"
 
 #include "common/c_common.h"
@@ -45,7 +45,12 @@ namespace ncore
     {
         if (currentTimeInMillis - lastReadInMillis >= readPeriodInMillis)
         {
-            lastReadInMillis = currentTimeInMillis;
+            lastReadInMillis -= currentTimeInMillis;
+            if (currentTimeInMillis - lastReadInMillis >= readPeriodInMillis)
+            {
+                // If the gap is too large, hard reset to the current time
+                lastReadInMillis = currentTimeInMillis;
+            }
             return true;
         }
         return false;
@@ -79,7 +84,7 @@ namespace ncore
 
                     if (appState->gSensorPacket.finalize() > 0)
                     {
-                        nremote::write(appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+                        ntcp::write(state->tcp, state->wifi->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
                     }
                 }
             }
@@ -141,7 +146,7 @@ namespace ncore
 
             if (appState->gSensorPacket.finalize() > 0)
             {
-                nremote::write(appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+                ntcp::write(state->tcp,state->wifi->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
 
@@ -201,7 +206,7 @@ namespace ncore
 
             if (appState->gSensorPacket.finalize() > 0)
             {
-                nremote::write(appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+                ntcp::write(state->tcp,state->wifi->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
             }
         }
 #endif
@@ -230,22 +235,22 @@ namespace ncore
 
             // the main program to execute sensor reading
             ntask::program_t main_program = program(exec, "airquality main program");
-            xbegin(exec, main_program);
+            op_begin(exec, main_program);
             {
 #ifdef ENABLE_BH1750
-                xrun_periodic(exec, read_bh1750, 1000);  // every 1 s
+                op_run_periodic(exec, read_bh1750, 1000);  // every 1 s
 #endif
 #ifdef ENABLE_BME280
-                xrun_periodic(exec, read_bme280, 1000);  // every 1 s
+                op_run_periodic(exec, read_bme280, 1000);  // every 1 s
 #endif
 #ifdef ENABLE_SCD41
-                xrun_periodic(exec, read_scd41, 2000);  // every 2 s
+                op_run_periodic(exec, read_scd41, 2000);  // every 2 s
 #endif
-                xreturn(exec);
+                op_return(exec);
             }
-            xend(exec);
+            op_end(exec);
 
-            nnode::connected(exec, main_program, state);
+            nnode::initialize(exec, main_program, state);
         }
     }  // namespace napp
 }  // namespace ncore

@@ -4,7 +4,6 @@
 #include "rdno_core/c_linear_allocator.h"
 #include "rdno_core/c_gpio.h"
 #include "rdno_wifi/c_wifi.h"
-#include "rdno_wifi/c_remote.h"
 #include "rdno_wifi/c_node.h"
 #include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
@@ -54,14 +53,14 @@ namespace ncore
 
             // the main program to execute sensor reading
             ntask::program_t main_program = program(exec, "magnet main program");
-            xbegin(exec, main_program);
+            op_begin(exec, main_program);
             {
-                xrun_periodic(exec, app_main, 100);  // every 100 ms
-                xreturn(exec);
+                op_run_periodic(exec, app_main, 100);  // every 100 ms
+                op_return(exec);
             }
-            xend(exec);
+            op_end(exec);
 
-            nnode::connected(exec, main_program, state);
+            nnode::initialize(exec, main_program, state);
             nserial::println("Setup done...");
         }
     }  // namespace napp
