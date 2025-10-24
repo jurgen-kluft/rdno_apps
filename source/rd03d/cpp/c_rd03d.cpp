@@ -22,63 +22,67 @@ namespace ncore
 
 namespace ncore
 {
-    ntask::result_t app_main(ntask::state_t* state);
-
-    namespace ntask
-    {
-        // the main program to execute sensor reading
-        program_t create_main_program(ntask::executor_t* exec)
-        {
-            program_t main_program = program(exec, "rd03d main program");
-            op_begin(exec, main_program);
-            {
-                op_run_periodic(exec, app_main, 100);  // every 100 ms
-            }
-            op_end(exec);
-            return main_program;
-        }
-    }  // namespace ntask
-
     namespace napp
     {
-        void setup(ntask::executor_t* exec, ntask::state_t* state)
+        ntask::result_t func_read(state_t* state)
+        {
+            ncore::state_app_t* appState = state->app;
+
+            if (nsensors::nrd03d::update())
+            {
+                nsensors::nrd03d::target_t tgt[3];
+                for (s8 i = 0; i < 3; ++i)
+                {
+                    nsensors::nrd03d::getTarget(i, tgt[i]);
+                }
+
+                // nserial::println("-------------------------");
+                // nserial::printf("X: %d, %d, %d\n", va_t((s32)tgt[0].x), va_t((s32)tgt[1].x), va_t((s32)tgt[2].x));
+                // nserial::printf("Y: %d, %d, %d\n", va_t((s32)tgt[0].y), va_t((s32)tgt[1].y), va_t((s32)tgt[2].y));
+                // nserial::printf("S: %d, %d, %d\n", va_t((s32)tgt[0].s), va_t((s32)tgt[1].s), va_t((s32)tgt[2].s));
+
+                // A sensor packet size for max 3 targets
+                // x=s16, y=s16, z=s16 = 9 bytes
+                // total = 2 + 3*9 = 29 bytes
+            }
+
+            return ntask::RESULT_OK;
+        }
+
+        // the main program to execute sensor reading
+        ntask::periodic_t gReadPeriodic(100);  // Every 100 ms
+        void              main_program(ntask::scheduler_t* exec, state_t* state)
+        {
+            if (ntask::is_first_call(exec))
+            {
+                ntask::init_periodic(exec, gReadPeriodic);
+            }
+            else
+            {
+                if (ntask::periodic(exec, gReadPeriodic))
+                {
+                    ntask::call(exec, func_read);
+                }
+            }
+        }
+        ntask::program_t gMainProgram(main_program);
+        state_task_t     gAppTask;
+
+        void setup(state_t* state)
         {
             state->app = &gAppState;
 
             // Initialize RD03D sensor with rx and tx pin
             nsensors::nrd03d::begin(20, 21);
 
-            ntask::program_t main_program = ntask::create_main_program(exec);
-            nnode::initialize(exec, main_program, state);
+            ntask::set_main(state, &gAppTask, &gMainProgram);
+            nnode::initialize(state, &gAppTask);
         }
+
+        void tick(state_t* state) 
+        {
+            ntask::tick(state, &gAppTask);
+        }
+
     }  // namespace napp
 }  // namespace ncore
-
-namespace ncore
-{
-    ntask::result_t app_main(ntask::state_t* state)
-    {
-        ncore::state_app_t* appState = state->app;
-
-        if (nsensors::nrd03d::update())
-        {
-            nsensors::nrd03d::target_t tgt[3];
-            for (s8 i = 0; i < 3; ++i)
-            {
-                nsensors::nrd03d::getTarget(i, tgt[i]);
-            }
-
-            // nserial::println("-------------------------");
-            // nserial::printf("X: %d, %d, %d\n", va_t((s32)tgt[0].x), va_t((s32)tgt[1].x), va_t((s32)tgt[2].x));
-            // nserial::printf("Y: %d, %d, %d\n", va_t((s32)tgt[0].y), va_t((s32)tgt[1].y), va_t((s32)tgt[2].y));
-            // nserial::printf("S: %d, %d, %d\n", va_t((s32)tgt[0].s), va_t((s32)tgt[1].s), va_t((s32)tgt[2].s));
-
-            // A sensor packet size for max 3 targets
-            // x=s16, y=s16, z=s16 = 9 bytes
-            // total = 2 + 3*9 = 29 bytes
-        }
-
-        return ntask::RESULT_OK;
-    }
-}  // namespace ncore
-

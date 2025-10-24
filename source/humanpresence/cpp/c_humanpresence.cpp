@@ -38,46 +38,17 @@ namespace ncore
 
 namespace ncore
 {
-    ntask::result_t app_main(ntask::state_t* state);
-
     namespace napp
     {
-        void setup(ntask::executor_t* exec, ntask::state_t* state)
+        ntask::result_t func_read(state_t* state)
         {
-            state->app = &gAppState;
+            ncore::state_app_t* appState = state->app;
 
-            // Initialize the sensors
-            const u8 rx = 15;            // RX pin for HMMD
-            const u8 tx = 16;            // TX pin for HMMD
-            nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
-
-            // the main program to execute sensor reading
-            ntask::program_t main_program = program(exec, "human presence main program");
-            op_begin(exec, main_program);
+            // Read the HMMD sensor data
+            s8  presence     = appState->gLastPresence;
+            u16 distanceInCm = appState->gLastDistanceInCm;
+            if (nsensors::readHMMD2(&presence, &distanceInCm))
             {
-                op_run_periodic(exec, app_main, 100);  // every 100 ms
-                op_return(exec);
-            }
-            op_end(exec);
-
-            nnode::initialize(exec, main_program, state);
-
-            nserial::println("Setup done...");
-        }
-    }  // namespace napp
-}  // namespace ncore
-
-namespace ncore
-{
-    ntask::result_t app_main(ntask::state_t* state)
-    {
-        ncore::state_app_t* appState = state->app;
-
-        // Read the HMMD sensor data
-        s8  presence     = appState->gLastPresence;
-        u16 distanceInCm = appState->gLastDistanceInCm;
-        if (nsensors::readHMMD2(&presence, &distanceInCm))
-        {
 #if 0
             nserial::print("Read Presence: ");
             nserial::println(presence == 1 ? "On" : "Off");
@@ -88,65 +59,105 @@ namespace ncore
             nserial::print(distanceStr.m_const);
             nserial::println(" cm");
 #endif
-            if ((appState->gLastPresenceStream & 0x8000000000000000) == 0)
-            {
-                appState->gLastPresence0 -= 1;
-            }
-            else
-            {
-                appState->gLastPresence1 -= 1;
-            }
-
-            // Write a custom (binary-format) network message
-            appState->gSensorPacket.begin();
-            if (presence != 0)
-            {
-                appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 1;
-                appState->gLastPresence1 += 1;
-            }
-            else
-            {
-                appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 0;
-                appState->gLastPresence0 += 1;
-            }
-
-            // Presence is true if in the stream of last 64 samples more than 56 samples were 'presence detected'
-            presence = (appState->gLastPresence1 > 56) ? 1 : 0;
-
-            if (presence != appState->gLastPresence)
-            {
-                appState->gLastPresence = presence;
-
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P1, id))
+                if ((appState->gLastPresenceStream & 0x8000000000000000) == 0)
                 {
-                    appState->gSensorPacket.write_sensor(id, (u16)presence);
+                    appState->gLastPresence0 -= 1;
                 }
-                if (distanceInCm > 0 && distanceInCm < 3200)
+                else
                 {
-                    if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_D1, id))
+                    appState->gLastPresence1 -= 1;
+                }
+
+                // Write a custom (binary-format) network message
+                appState->gSensorPacket.begin();
+                if (presence != 0)
+                {
+                    appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 1;
+                    appState->gLastPresence1 += 1;
+                }
+                else
+                {
+                    appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 0;
+                    appState->gLastPresence0 += 1;
+                }
+
+                // Presence is true if in the stream of last 64 samples more than 56 samples were 'presence detected'
+                presence = (appState->gLastPresence1 > 56) ? 1 : 0;
+
+                if (presence != appState->gLastPresence)
+                {
+                    appState->gLastPresence = presence;
+
+                    u16 id;
+                    if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P1, id))
                     {
-                        appState->gLastDistanceInCm = distanceInCm;
-                        appState->gSensorPacket.write_sensor(id, (u16)distanceInCm);
+                        appState->gSensorPacket.write_sensor(id, (u16)presence);
+                    }
+                    if (distanceInCm > 0 && distanceInCm < 3200)
+                    {
+                        if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_D1, id))
+                        {
+                            appState->gLastDistanceInCm = distanceInCm;
+                            appState->gSensorPacket.write_sensor(id, (u16)distanceInCm);
+                        }
+                    }
+
+                    if (appState->gSensorPacket.finalize() > 0)
+                    {
+#ifdef TARGET_DEBUG
+                        nserial::print("Sending presence=");
+                        nserial::print(presence == 1 ? "On" : "Off");
+                        nserial::print(", distance=");
+                        char  distanceStrBuffer[16];
+                        str_t distanceStr = str_mutable(distanceStrBuffer, 16);
+                        to_str(distanceStr, (s32)distanceInCm, 10);
+                        nserial::print(distanceStr.m_const);
+                        nserial::println(" cm");
+#endif
+                        ntcp::write(state->tcp, state->node->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
                     }
                 }
+            }
+            return ntask::RESULT_OK;
+        }
 
-                if (appState->gSensorPacket.finalize() > 0)
+        ntask::periodic_t gReadPeriodic(100);  // Every 100 ms
+        void main_program(ntask::scheduler_t* exec, state_t* state)
+        {
+            if (ntask::is_first_call(exec))
+            {
+                ntask::init_periodic(exec, gReadPeriodic);
+            }
+            else
+            {
+                if (ntask::periodic(exec, gReadPeriodic))
                 {
-#ifdef TARGET_DEBUG
-                    nserial::print("Sending presence=");
-                    nserial::print(presence == 1 ? "On" : "Off");
-                    nserial::print(", distance=");
-                    char  distanceStrBuffer[16];
-                    str_t distanceStr = str_mutable(distanceStrBuffer, 16);
-                    to_str(distanceStr, (s32)distanceInCm, 10);
-                    nserial::print(distanceStr.m_const);
-                    nserial::println(" cm");
-#endif
-                    ntcp::write(state->tcp, state->wifi->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+                    ntask::call(exec, func_read);
                 }
             }
         }
-        return ntask::RESULT_OK;
-    }
+        ntask::program_t gMainProgram(main_program);
+        state_task_t     gAppTask;
+
+        void setup(state_t* state)
+        {
+            state->app = &gAppState;
+
+            // Initialize the sensors
+            const u8 rx = 15;            // RX pin for HMMD
+            const u8 tx = 16;            // TX pin for HMMD
+            nsensors::initHMMD(rx, tx);  // Initialize the HMMD sensor
+
+            ntask::set_main(state, &gAppTask, &gMainProgram);
+            nnode::initialize(state, &gAppTask);
+
+            nserial::println("Setup done...");
+        }
+
+        void tick(state_t* state)
+        {
+            ntask::tick(state, &gAppTask);
+        }
+
+    }  // namespace napp
 }  // namespace ncore

@@ -37,7 +37,9 @@ namespace ncore
           /* PM 1.0                     */ {"PM1", 3, nconfig::PARAM_ID_PM1, nconfig::PARAM_TYPE_U16},
           /* PM 2.5                     */ {"PM2", 3, nconfig::PARAM_ID_PM2, nconfig::PARAM_TYPE_U16},
           /* PM 10                      */ {"PMA", 3, nconfig::PARAM_ID_PMA, nconfig::PARAM_TYPE_U16},
-          /* Remote Server Port         */ {"PORT", 4, nconfig::PARAM_ID_REMOTE_PORT, nconfig::PARAM_TYPE_U16},
+          /* Remote Mode                */ {"RM", 2, nconfig::PARAM_ID_REMOTE_MODE, nconfig::PARAM_TYPE_U8},
+          /* Remote Server IP           */ {"RIP", 3, nconfig::PARAM_ID_REMOTE_IP, nconfig::PARAM_TYPE_U32},
+          /* Remote Server Port         */ {"RPORT", 5, nconfig::PARAM_ID_REMOTE_PORT, nconfig::PARAM_TYPE_U16},
           /* Position x/y/z             */ {"PX", 2, nconfig::PARAM_ID_PX, nconfig::PARAM_TYPE_U16},
           /* Position x/y/z             */ {"PY", 2, nconfig::PARAM_ID_PY, nconfig::PARAM_TYPE_U16},
           /* Position x/y/z             */ {"PZ", 2, nconfig::PARAM_ID_PZ, nconfig::PARAM_TYPE_U16},
@@ -45,7 +47,6 @@ namespace ncore
           /* RSSI                       */ {"RSSI", 4, nconfig::PARAM_ID_RSSI, nconfig::PARAM_TYPE_U16},
           /* State                      */ {"S", 1, nconfig::PARAM_ID_S, nconfig::PARAM_TYPE_U16},
           /* WiFi SSID                  */ {"SSID", 4, nconfig::PARAM_ID_WIFI_SSID, nconfig::PARAM_TYPE_STRING},
-          /* Remote Server IP           */ {"SERVER", 6, nconfig::PARAM_ID_REMOTE_IP, nconfig::PARAM_TYPE_U32},
           /* Temperature                */ {"T", 1, nconfig::PARAM_ID_T, nconfig::PARAM_TYPE_U16},
           /* UV                         */ {"UV", 2, nconfig::PARAM_ID_UV, nconfig::PARAM_TYPE_U16},
           /* Vibration                  */ {"V", 1, nconfig::PARAM_ID_V, nconfig::PARAM_TYPE_U16},
@@ -106,11 +107,14 @@ namespace ncore
             const str_t pass = str_const(WIFI_PASSWORD);
             nconfig::set_string(config, nconfig::PARAM_ID_WIFI_PASSWORD, pass);
 
-            u32 remote_server = (192 << 24) | (168 << 16) | (8 << 8) | 88;
+            const u32 remote_server = SERVER_IP;
             nconfig::set_uint32(config, nconfig::PARAM_ID_REMOTE_IP, remote_server);
 
             const u16 remote_port = SERVER_PORT;
             nconfig::set_uint16(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
+
+            const u8 remote_mode = SERVER_MODE;
+            nconfig::set_uint8(config, nconfig::PARAM_ID_REMOTE_MODE, remote_mode);
         }
     }  // namespace napp
 }  // namespace ncore
