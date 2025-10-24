@@ -26,8 +26,6 @@ namespace ncore
     {
         ntask::result_t func_read(state_t* state)
         {
-            ncore::state_app_t* appState = state->app;
-
             if (nsensors::nrd03d::update())
             {
                 nsensors::nrd03d::target_t tgt[3];
@@ -70,8 +68,6 @@ namespace ncore
 
         void setup(state_t* state)
         {
-            state->app = &gAppState;
-
             // Initialize RD03D sensor with rx and tx pin
             nsensors::nrd03d::begin(20, 21);
 

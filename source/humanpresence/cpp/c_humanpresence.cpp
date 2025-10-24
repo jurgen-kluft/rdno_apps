@@ -42,11 +42,9 @@ namespace ncore
     {
         ntask::result_t func_read(state_t* state)
         {
-            ncore::state_app_t* appState = state->app;
-
             // Read the HMMD sensor data
-            s8  presence     = appState->gLastPresence;
-            u16 distanceInCm = appState->gLastDistanceInCm;
+            s8  presence     = gAppState.gLastPresence;
+            u16 distanceInCm = gAppState.gLastDistanceInCm;
             if (nsensors::readHMMD2(&presence, &distanceInCm))
             {
 #if 0
@@ -59,50 +57,50 @@ namespace ncore
             nserial::print(distanceStr.m_const);
             nserial::println(" cm");
 #endif
-                if ((appState->gLastPresenceStream & 0x8000000000000000) == 0)
+                if ((gAppState.gLastPresenceStream & 0x8000000000000000) == 0)
                 {
-                    appState->gLastPresence0 -= 1;
+                    gAppState.gLastPresence0 -= 1;
                 }
                 else
                 {
-                    appState->gLastPresence1 -= 1;
+                    gAppState.gLastPresence1 -= 1;
                 }
 
                 // Write a custom (binary-format) network message
-                appState->gSensorPacket.begin();
+                gAppState.gSensorPacket.begin();
                 if (presence != 0)
                 {
-                    appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 1;
-                    appState->gLastPresence1 += 1;
+                    gAppState.gLastPresenceStream = (gAppState.gLastPresenceStream << 1) | 1;
+                    gAppState.gLastPresence1 += 1;
                 }
                 else
                 {
-                    appState->gLastPresenceStream = (appState->gLastPresenceStream << 1) | 0;
-                    appState->gLastPresence0 += 1;
+                    gAppState.gLastPresenceStream = (gAppState.gLastPresenceStream << 1) | 0;
+                    gAppState.gLastPresence0 += 1;
                 }
 
                 // Presence is true if in the stream of last 64 samples more than 56 samples were 'presence detected'
-                presence = (appState->gLastPresence1 > 56) ? 1 : 0;
+                presence = (gAppState.gLastPresence1 > 56) ? 1 : 0;
 
-                if (presence != appState->gLastPresence)
+                if (presence != gAppState.gLastPresence)
                 {
-                    appState->gLastPresence = presence;
+                    gAppState.gLastPresence = presence;
 
                     u16 id;
                     if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P1, id))
                     {
-                        appState->gSensorPacket.write_sensor(id, (u16)presence);
+                        gAppState.gSensorPacket.write_sensor(id, (u16)presence);
                     }
                     if (distanceInCm > 0 && distanceInCm < 3200)
                     {
                         if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_D1, id))
                         {
-                            appState->gLastDistanceInCm = distanceInCm;
-                            appState->gSensorPacket.write_sensor(id, (u16)distanceInCm);
+                            gAppState.gLastDistanceInCm = distanceInCm;
+                            gAppState.gSensorPacket.write_sensor(id, (u16)distanceInCm);
                         }
                     }
 
-                    if (appState->gSensorPacket.finalize() > 0)
+                    if (gAppState.gSensorPacket.finalize() > 0)
                     {
 #ifdef TARGET_DEBUG
                         nserial::print("Sending presence=");
@@ -114,7 +112,7 @@ namespace ncore
                         nserial::print(distanceStr.m_const);
                         nserial::println(" cm");
 #endif
-                        ntcp::write(state->tcp, state->node->tcp_client, appState->gSensorPacket.Data, appState->gSensorPacket.Size);  // Send the sensor packet to the server
+                        ntcp::write(state->tcp, state->node->tcp_client, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);  // Send the sensor packet to the server
                     }
                 }
             }
@@ -141,8 +139,6 @@ namespace ncore
 
         void setup(state_t* state)
         {
-            state->app = &gAppState;
-
             // Initialize the sensors
             const u8 rx = 15;            // RX pin for HMMD
             const u8 tx = 16;            // TX pin for HMMD

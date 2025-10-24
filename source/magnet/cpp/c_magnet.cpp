@@ -41,8 +41,6 @@ namespace ncore
     {
         void setup(state_t* state)
         {
-            state->app = &gAppState;
-
             // This is where you would set up your hardware, peripherals, etc.
             ngpio::set_pinmode(gAppState.m_switch_pin, ncore::ngpio::ModeInput);
             ngpio::set_pinmode(gAppState.m_poweroff_pin, ncore::ngpio::ModeOutput);
