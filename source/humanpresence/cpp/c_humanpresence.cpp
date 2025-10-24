@@ -117,14 +117,14 @@ namespace ncore
             {
                 appState->gLastPresence = presence;
 
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_P1, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P1, id))
                 {
                     appState->gSensorPacket.write_sensor(id, (u16)presence);
                 }
                 if (distanceInCm > 0 && distanceInCm < 3200)
                 {
-                    if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_D1, id))
+                    if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_D1, id))
                     {
                         appState->gLastDistanceInCm = distanceInCm;
                         appState->gSensorPacket.write_sensor(id, (u16)distanceInCm);
@@ -150,22 +150,3 @@ namespace ncore
         return ntask::RESULT_OK;
     }
 }  // namespace ncore
-
-#ifndef TARGET_ESP32
-
-    // We need a 'void main()' function to run the code on non-ESP32 platforms
-    #include "rdno_core/c_setup_loop.h"
-
-int main()
-{
-    setup();  // Call the setup function to initialize the system
-
-    while (true)
-    {
-        loop();  // Call the loop function continuously
-    }
-
-    return 0;  // Return success
-}
-
-#endif

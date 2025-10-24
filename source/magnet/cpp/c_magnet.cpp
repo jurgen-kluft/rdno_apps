@@ -92,22 +92,3 @@ namespace ncore
         return ntask::RESULT_OK;
     }
 }  // namespace ncore
-
-#ifndef TARGET_ESP32
-
-    // We need a 'void main()' function to run the code on non-ESP32 platforms
-    #include "rdno_core/c_setup_loop.h"
-
-int main()
-{
-    setup();  // Call the setup function to initialize the system
-
-    while (true)
-    {
-        loop();  // Call the loop function continuously
-    }
-
-    return 0;  // Return success
-}
-
-#endif

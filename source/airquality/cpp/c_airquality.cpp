@@ -73,8 +73,8 @@ namespace ncore
             {
                 appState->gLastLux = lux;
 
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_LUX, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_LUX, id))
                 {
                     // Write a custom (binary-format) network message
                     appState->gSensorPacket.begin();
@@ -115,8 +115,8 @@ namespace ncore
 
             if (appState->gLastBme_temp_s8 != bme_temp_s8)
             {
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_T, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_T, id))
                 {
                     appState->gLastBme_temp_s8 = bme_temp_s8;
                     nserial::printf("Temperature: %d °C\n", va_t((s32)bme_temp_s8));
@@ -125,8 +125,8 @@ namespace ncore
             }
             if (appState->gLastBme_pres_u16 != bme_pres_u16)
             {
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_P, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P, id))
                 {
                     appState->gLastBme_pres_u16 = bme_pres_u16;
                     nserial::printf("Pressure: %d hPa\n", va_t((u32)bme_pres_u16));
@@ -135,8 +135,8 @@ namespace ncore
             }
             if (appState->gLastBme_humi_u8 != bme_humi_u8)
             {
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_H, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_H, id))
                 {
                     appState->gLastBme_humi_u8 = bme_humi_u8;
                     nserial::printf("Humidity: %d %%\n", va_t((u32)bme_humi_u8));
@@ -176,8 +176,8 @@ namespace ncore
             if (appState->gLastScd_co2 != scd_co2)
             {
                 appState->gLastScd_co2 = scd_co2;
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_CO2, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_CO2, id))
                 {
                     nserial::printf("SCD CO2: %d ppm\n", va_t((u32)scd_co2));
                     appState->gSensorPacket.write_sensor(id, (u16)scd_co2);
@@ -186,8 +186,8 @@ namespace ncore
             if (appState->gLastScd_temp_s8 != scd_temp_s8)
             {
                 appState->gLastScd_temp_s8 = scd_temp_s8;
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_T, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_T, id))
                 {
                     nserial::printf("SCD Temperature: %d °C\n", va_t((s32)scd_temp_s8));
                     appState->gSensorPacket.write_sensor(id, (u16)scd_temp_s8);
@@ -196,8 +196,8 @@ namespace ncore
             if (appState->gLastScd_humi_u8 != scd_humi_u8)
             {
                 appState->gLastScd_humi_u8 = scd_humi_u8;
-                u8 id;
-                if (nconfig::get_uint8(state->config, nconfig::PARAM_ID_H, id))
+                u16 id;
+                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_H, id))
                 {
                     nserial::printf("SCD Humidity: %d %%\n", va_t((u32)scd_humi_u8));
                     appState->gSensorPacket.write_sensor(id, (u16)scd_humi_u8);
