@@ -27,7 +27,6 @@ namespace ncore
     struct state_app_t
     {
         npacket::packet_t gSensorPacket;  // Sensor packet for sending data
-        const u8          kVersion = 1;   // Version number for the packet
 
         u16 gLastLux = 0;  // Last read light intensity value
 
@@ -39,7 +38,8 @@ namespace ncore
         s8  gLastScd_temp_s8 = 0;
         u8  gLastScd_humi_u8 = 0;
     };
-    state_app_t gAppState;
+    state_app_t  gAppState;
+    state_task_t gAppTask;
 
     static bool trigger_read(const u64 currentTimeInMillis, u64& lastReadInMillis, const u64 readPeriodInMillis)
     {
@@ -72,20 +72,11 @@ namespace ncore
             {
                 gAppState.gLastLux = lux;
 
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_LUX, id))
-                {
-                    // Write a custom (binary-format) network message
-                    gAppState.gSensorPacket.begin();
-
-                    nserial::printf("Light: %d lx\n", va_t((u32)lux));
-                    gAppState.gSensorPacket.write_sensor(id, lux);
-
-                    if (gAppState.gSensorPacket.finalize() > 0)
-                    {
-                        ntcp::write(state->tcp, state->node->tcp_client, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);  // Send the sensor packet to the server
-                    }
-                }
+                // Write a custom (binary-format) network message
+                gAppState.gSensorPacket.begin(state->wifi->m_mac);
+                nserial::printf("Light: %d lx\n", va_t((u32)lux));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
+                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
             }
         }
 #endif
@@ -108,42 +99,30 @@ namespace ncore
             const u8  bme_humi_u8  = static_cast<u8>(bme_humi);   // Humidity to one unsigned byte (%)
 
             // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin();
+            gAppState.gSensorPacket.begin(state->wifi->m_mac);
 
             if (gAppState.gLastBme_temp_s8 != bme_temp_s8)
             {
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_T, id))
-                {
-                    gAppState.gLastBme_temp_s8 = bme_temp_s8;
-                    nserial::printf("Temperature: %d °C\n", va_t((s32)bme_temp_s8));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)bme_temp_s8);
-                }
+                gAppState.gLastBme_temp_s8 = bme_temp_s8;
+                nserial::printf("Temperature: %d °C\n", va_t((s32)bme_temp_s8));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)bme_temp_s8);
             }
             if (gAppState.gLastBme_pres_u16 != bme_pres_u16)
             {
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P, id))
-                {
-                    gAppState.gLastBme_pres_u16 = bme_pres_u16;
-                    nserial::printf("Pressure: %d hPa\n", va_t((u32)bme_pres_u16));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)bme_pres_u16);
-                }
+                gAppState.gLastBme_pres_u16 = bme_pres_u16;
+                nserial::printf("Pressure: %d hPa\n", va_t((u32)bme_pres_u16));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESSURE, (u16)bme_pres_u16);
             }
             if (gAppState.gLastBme_humi_u8 != bme_humi_u8)
             {
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_H, id))
-                {
-                    gAppState.gLastBme_humi_u8 = bme_humi_u8;
-                    nserial::printf("Humidity: %d %%\n", va_t((u32)bme_humi_u8));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)bme_humi_u8);
-                }
+                gAppState.gLastBme_humi_u8 = bme_humi_u8;
+                nserial::printf("Humidity: %d %%\n", va_t((u32)bme_humi_u8));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)bme_humi_u8);
             }
 
             if (gAppState.gSensorPacket.finalize() > 0)
             {
-                ntcp::write(state->tcp, state->node->tcp_client, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);  // Send the sensor packet to the server
+                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
             }
         }
 
@@ -163,7 +142,7 @@ namespace ncore
         if (valid_scd41)
         {
             // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin();
+            gAppState.gSensorPacket.begin(state->wifi->m_mac);
 
             const s8 scd_temp_s8 = static_cast<s8>(scd_temp);  // Temperature to one signed byte (°C)
             const u8 scd_humi_u8 = static_cast<u8>(scd_humi);  // Humidity to one unsigned byte (%)
@@ -171,37 +150,25 @@ namespace ncore
             if (gAppState.gLastScd_co2 != scd_co2)
             {
                 gAppState.gLastScd_co2 = scd_co2;
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_CO2, id))
-                {
-                    nserial::printf("SCD CO2: %d ppm\n", va_t((u32)scd_co2));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)scd_co2);
-                }
+                nserial::printf("SCD CO2: %d ppm\n", va_t((u32)scd_co2));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_CO2, (u16)scd_co2);
             }
             if (gAppState.gLastScd_temp_s8 != scd_temp_s8)
             {
                 gAppState.gLastScd_temp_s8 = scd_temp_s8;
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_T, id))
-                {
-                    nserial::printf("SCD Temperature: %d °C\n", va_t((s32)scd_temp_s8));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)scd_temp_s8);
-                }
+                nserial::printf("SCD Temperature: %d °C\n", va_t((s32)scd_temp_s8));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)scd_temp_s8);
             }
             if (gAppState.gLastScd_humi_u8 != scd_humi_u8)
             {
                 gAppState.gLastScd_humi_u8 = scd_humi_u8;
-                u16 id;
-                if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_H, id))
-                {
-                    nserial::printf("SCD Humidity: %d %%\n", va_t((u32)scd_humi_u8));
-                    gAppState.gSensorPacket.write_sensor(id, (u16)scd_humi_u8);
-                }
+                nserial::printf("SCD Humidity: %d %%\n", va_t((u32)scd_humi_u8));
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)scd_humi_u8);
             }
 
             if (gAppState.gSensorPacket.finalize() > 0)
             {
-                ntcp::write(state->tcp, state->node->tcp_client, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);  // Send the sensor packet to the server
+                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
             }
         }
 #endif
@@ -214,9 +181,9 @@ namespace ncore
 {
     namespace napp
     {
-        ntask::periodic_t periodic_bh1750(1000); // Every 1000 ms
-        ntask::periodic_t periodic_bme280(1000); // Every 1000 ms
-        ntask::periodic_t periodic_scd41(2000);  // Every 2000 ms
+        ntask::periodic_t periodic_bh1750(1000);  // Every 1000 ms
+        ntask::periodic_t periodic_bme280(1000);  // Every 1000 ms
+        ntask::periodic_t periodic_scd41(2000);   // Every 2000 ms
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
@@ -226,6 +193,7 @@ namespace ncore
                 ntask::init_periodic(exec, periodic_bme280);
                 ntask::init_periodic(exec, periodic_scd41);
             }
+
 
 #ifdef ENABLE_BH1750
             if (ntask::periodic(exec, periodic_bh1750))
@@ -242,15 +210,20 @@ namespace ncore
 #ifdef ENABLE_SCD41
             if (ntask::periodic(exec, periodic_scd41))
             {
+                nserial::printfln("Read Scd41...");
                 ntask::call(exec, read_scd41);
             }
 #endif
         }
         ntask::program_t gMainProgram(main_program);
-        state_task_t     gAppTask;
+
+#define SDA_PIN 21
+#define SCL_PIN 22
 
         void setup(state_t* state)
         {
+            nwire::begin(SDA_PIN, SCL_PIN);  // Initialize I2C bus
+
 #ifdef ENABLE_BH1750
             nsensors::initBH1750();  // Initialize the BH1750 sensor
 #endif
@@ -260,15 +233,11 @@ namespace ncore
 #ifdef ENABLE_SCD41
             nsensors::initSCD41();  // Initialize the SCD4X sensor
 #endif
-
             ntask::set_main(state, &gAppTask, &gMainProgram);
             nnode::initialize(state, &gAppTask);
         }
 
-        void tick(state_t* state)
-        {
-            ntask::tick(state, &gAppTask);
-        }
+        void tick(state_t* state) { ntask::tick(state, &gAppTask); }
 
     }  // namespace napp
 }  // namespace ncore

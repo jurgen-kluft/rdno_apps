@@ -5,8 +5,6 @@
     #pragma once
 #endif
 
-#include "rdno_core/c_config.h"
-#include "rdno_core/c_packet.h"
 
 namespace ncore
 {

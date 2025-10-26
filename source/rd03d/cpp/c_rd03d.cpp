@@ -1,5 +1,4 @@
 #include "rd03d/c_rd03d.h"
-#include "rdno_sensors/c_rd03d.h"
 
 #include "rdno_core/c_gpio.h"
 #include "rdno_wifi/c_node.h"
@@ -8,6 +7,8 @@
 #include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
+
+#include "rdno_sensors/c_rd03d.h"
 
 #include "common/c_common.h"
 

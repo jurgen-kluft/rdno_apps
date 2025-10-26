@@ -1,12 +1,8 @@
 #include "humanpresence/c_humanpresence.h"
 
 #include "rdno_core/c_app.h"
-#include "rdno_core/c_config.h"
-#include "rdno_core/c_malloc.h"
 #include "rdno_wifi/c_wifi.h"
 #include "rdno_wifi/c_node.h"
-#include "rdno_wifi/c_tcp.h"
-#include "rdno_core/c_nvstore.h"
 #include "rdno_core/c_timer.h"
 #include "rdno_core/c_serial.h"
 #include "rdno_core/c_packet.h"
@@ -67,7 +63,7 @@ namespace ncore
                 }
 
                 // Write a custom (binary-format) network message
-                gAppState.gSensorPacket.begin();
+                gAppState.gSensorPacket.begin(state->wifi->m_mac);
                 if (presence != 0)
                 {
                     gAppState.gLastPresenceStream = (gAppState.gLastPresenceStream << 1) | 1;
@@ -86,18 +82,11 @@ namespace ncore
                 {
                     gAppState.gLastPresence = presence;
 
-                    u16 id;
-                    if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_P1, id))
-                    {
-                        gAppState.gSensorPacket.write_sensor(id, (u16)presence);
-                    }
+                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1, (u16)presence);
                     if (distanceInCm > 0 && distanceInCm < 3200)
                     {
-                        if (nconfig::get_uint16(state->config, nconfig::PARAM_ID_D1, id))
-                        {
-                            gAppState.gLastDistanceInCm = distanceInCm;
-                            gAppState.gSensorPacket.write_sensor(id, (u16)distanceInCm);
-                        }
+                        gAppState.gLastDistanceInCm = distanceInCm;
+                        gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_DISTANCE1, distanceInCm);
                     }
 
                     if (gAppState.gSensorPacket.finalize() > 0)
@@ -112,7 +101,7 @@ namespace ncore
                         nserial::print(distanceStr.m_const);
                         nserial::println(" cm");
 #endif
-                        ntcp::write(state->tcp, state->node->tcp_client, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);  // Send the sensor packet to the server
+                        nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
                     }
                 }
             }
