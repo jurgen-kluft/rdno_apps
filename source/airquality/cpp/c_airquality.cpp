@@ -181,9 +181,9 @@ namespace ncore
 {
     namespace napp
     {
-        ntask::periodic_t periodic_bh1750(1000);  // Every 1000 ms
-        ntask::periodic_t periodic_bme280(1000);  // Every 1000 ms
-        ntask::periodic_t periodic_scd41(2000);   // Every 2000 ms
+        ntask::periodic_t periodic_bh1750(30000);  // Every half minute
+        ntask::periodic_t periodic_bme280(60000);  // Every minute
+        ntask::periodic_t periodic_scd41(120000);  // Every two minutes
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
@@ -193,7 +193,6 @@ namespace ncore
                 ntask::init_periodic(exec, periodic_bme280);
                 ntask::init_periodic(exec, periodic_scd41);
             }
-
 
 #ifdef ENABLE_BH1750
             if (ntask::periodic(exec, periodic_bh1750))
