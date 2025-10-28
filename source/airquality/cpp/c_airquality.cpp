@@ -17,10 +17,12 @@
 #include "rdno_sensors/c_bh1750.h"
 #include "rdno_sensors/c_bme280.h"
 #include "rdno_sensors/c_scd4x.h"
+#include "rdno_sensors/c_rd03d.h"
 
 #define ENABLE_BH1750
 #define ENABLE_BME280
 #define ENABLE_SCD41
+#define ENABLE_RD03D
 
 namespace ncore
 {
@@ -37,6 +39,9 @@ namespace ncore
         u16 gLastScd_co2     = 0;
         s8  gLastScd_temp_s8 = 0;
         u8  gLastScd_humi_u8 = 0;
+
+        u32 gRd03dDetectionBits[3] = {0, 0, 0};
+        u8  gRd03dDetected[3]      = {2, 2, 2};
     };
     state_app_t  gAppState;
     state_task_t gAppTask;
@@ -76,7 +81,10 @@ namespace ncore
                 gAppState.gSensorPacket.begin(state->wifi->m_mac);
                 nserial::printf("Light: %d lx\n", va_t((u32)lux));
                 gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+                if (gAppState.gSensorPacket.finalize() > 0)
+                {
+                    nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+                }
             }
         }
 #endif
@@ -175,6 +183,63 @@ namespace ncore
 
         return ntask::RESULT_OK;
     }
+
+    ntask::result_t read_rd03d(state_t* state)
+    {
+#ifdef ENABLE_RD03D
+        if (nsensors::nrd03d::update())
+        {
+            // Write a custom (binary-format) network message
+            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+
+            nsensors::nrd03d::target_t tgt[3];
+            for (s8 i = 0; i < 3; ++i)
+            {
+                if (nsensors::nrd03d::getTarget(i, tgt[i]))
+                {
+                    gAppState.gRd03dDetectionBits[i] = (gAppState.gRd03dDetectionBits[i] << 1) | 1;
+                    //nserial::printf("T%d: %d, %d\n", va_t(i), va_t(tgt[i].x), va_t(tgt[i].y));
+                }
+                else
+                {
+                    gAppState.gRd03dDetectionBits[i] = (gAppState.gRd03dDetectionBits[i] << 1) | 0;
+                }
+
+                u8 detected = gAppState.gRd03dDetected[i] & 1;  // Current detection state
+                if (detected == 0)
+                {
+                    // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
+                    if ((gAppState.gRd03dDetectionBits[i] & 0x7) == 0x7)
+                    {
+                        detected = 1;
+                    }
+                }
+                else
+                {
+                    // To transition from presence to no-presence we must have seen 20 no-detections in a row (2 seconds)
+                    if ((gAppState.gRd03dDetectionBits[i] & 0xFFFFF) == 0)
+                    {
+                        detected = 0;
+                    }
+                }
+
+                if (gAppState.gRd03dDetected[i] != detected)
+                {
+                    gAppState.gRd03dDetected[i] = detected;
+                    nserial::printf("T%d detection: %s\n", va_t(i), va_t(detected == 1 ? "PRESENCE" : "ABSENCE"));
+                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
+                }
+            }
+
+            if (gAppState.gSensorPacket.finalize() > 0)
+            {
+                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+            }
+        }
+#endif
+        return ntask::RESULT_OK;
+    }
+
 }  // namespace ncore
 
 namespace ncore
@@ -184,6 +249,7 @@ namespace ncore
         ntask::periodic_t periodic_bh1750(30000);  // Every half minute
         ntask::periodic_t periodic_bme280(60000);  // Every minute
         ntask::periodic_t periodic_scd41(120000);  // Every two minutes
+        ntask::periodic_t periodic_rd03d(100);     // Ten times per second
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
@@ -192,6 +258,7 @@ namespace ncore
                 ntask::init_periodic(exec, periodic_bh1750);
                 ntask::init_periodic(exec, periodic_bme280);
                 ntask::init_periodic(exec, periodic_scd41);
+                ntask::init_periodic(exec, periodic_rd03d);
             }
 
 #ifdef ENABLE_BH1750
@@ -209,8 +276,13 @@ namespace ncore
 #ifdef ENABLE_SCD41
             if (ntask::periodic(exec, periodic_scd41))
             {
-                nserial::printfln("Read Scd41...");
                 ntask::call(exec, read_scd41);
+            }
+#endif
+#ifdef ENABLE_RD03D
+            if (ntask::periodic(exec, periodic_rd03d))
+            {
+                ntask::call(exec, read_rd03d);
             }
 #endif
         }
@@ -231,6 +303,9 @@ namespace ncore
 #endif
 #ifdef ENABLE_SCD41
             nsensors::initSCD41();  // Initialize the SCD4X sensor
+#endif
+#ifdef ENABLE_RD03D
+            nsensors::nrd03d::begin(16, 17);  // Initialize RD03D sensor with rx and tx pin
 #endif
             ntask::set_main(state, &gAppTask, &gMainProgram);
             nnode::initialize(state, &gAppTask);
