@@ -126,6 +126,11 @@ namespace ncore
         ntask::program_t gMainProgram(main_program);
         state_task_t     gAppTask;
 
+        void presetup()
+        {
+            // This is where you would set up your hardware, peripherals, etc.
+        }
+
         void setup(state_t* state)
         {
             // Initialize the sensors

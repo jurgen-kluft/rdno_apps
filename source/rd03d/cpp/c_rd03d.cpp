@@ -67,6 +67,11 @@ namespace ncore
         ntask::program_t gMainProgram(main_program);
         state_task_t     gAppTask;
 
+        void presetup()
+        {
+            // This is where you would set up gpio pins
+        }
+
         void setup(state_t* state)
         {
             // Initialize RD03D sensor with rx and tx pin

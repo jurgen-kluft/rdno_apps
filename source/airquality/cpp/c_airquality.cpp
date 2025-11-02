@@ -26,40 +26,75 @@
 
 namespace ncore
 {
+    struct bme280_data_t
+    {
+        s8  temperature;
+        u16 pressure;
+        u8  humidity;
+
+        void reset()
+        {
+            temperature = 0;
+            pressure    = 0;
+            humidity    = 0;
+        }
+    };
+
+    struct bh1750_data_t
+    {
+        u16 lux;
+
+        void reset() { lux = 0; }
+    };
+
+    struct scd41_data_t
+    {
+        u16 co2;
+        s8  temperature;
+        u8  humidity;
+
+        void reset()
+        {
+            co2         = 0;
+            temperature = 0;
+            humidity    = 0;
+        }
+    };
+
+    struct rd03d_data_t
+    {
+        u32 DetectionBits[3];
+        u8  Detected[3];
+        u8  LastSendDetected[3];
+
+        void reset()
+        {
+            for (s8 i = 0; i < 3; ++i)
+            {
+                DetectionBits[i]    = 0;
+                Detected[i]         = 2;  // Unknown state
+                LastSendDetected[i] = 3;
+            }
+        }
+    };
+
     struct state_app_t
     {
         npacket::packet_t gSensorPacket;  // Sensor packet for sending data
 
-        u16 gLastLux = 0;  // Last read light intensity value
+        bme280_data_t gCurrentBme;
+        bme280_data_t gLastSendBme;
 
-        s8  gLastBme_temp_s8  = 0;
-        u16 gLastBme_pres_u16 = 0;
-        u8  gLastBme_humi_u8  = 0;
+        bh1750_data_t gCurrentBh;
+        bh1750_data_t gLastSendBh;
 
-        u16 gLastScd_co2     = 0;
-        s8  gLastScd_temp_s8 = 0;
-        u8  gLastScd_humi_u8 = 0;
+        scd41_data_t gCurrentScd;
+        scd41_data_t gLastSendScd;
 
-        u32 gRd03dDetectionBits[3] = {0, 0, 0};
-        u8  gRd03dDetected[3]      = {2, 2, 2};
+        rd03d_data_t gCurrentRd03d;
     };
     state_app_t  gAppState;
     state_task_t gAppTask;
-
-    static bool trigger_read(const u64 currentTimeInMillis, u64& lastReadInMillis, const u64 readPeriodInMillis)
-    {
-        if (currentTimeInMillis - lastReadInMillis >= readPeriodInMillis)
-        {
-            lastReadInMillis -= currentTimeInMillis;
-            if (currentTimeInMillis - lastReadInMillis >= readPeriodInMillis)
-            {
-                // If the gap is too large, hard reset to the current time
-                lastReadInMillis = currentTimeInMillis;
-            }
-            return true;
-        }
-        return false;
-    }
 
     ntask::result_t read_bh1750(state_t* state)
     {
@@ -70,21 +105,29 @@ namespace ncore
         // Read the BH1750 sensor data
         u16        lux          = 0;
         const bool valid_bh1750 = nsensors::updateBH1750(lux);
-
         if (valid_bh1750)
         {
-            if (gAppState.gLastLux != lux)
-            {
-                gAppState.gLastLux = lux;
+            gAppState.gCurrentBh.lux = lux;
+        }
+#endif
+        return ntask::RESULT_OK;
+    }
 
-                // Write a custom (binary-format) network message
-                gAppState.gSensorPacket.begin(state->wifi->m_mac);
-                nserial::printf("Light: %d lx\n", va_t((u32)lux));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
-                if (gAppState.gSensorPacket.finalize() > 0)
-                {
-                    nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
-                }
+    ntask::result_t send_bh1750(state_t* state)
+    {
+#ifdef ENABLE_BH1750
+        const u16 lux = gAppState.gCurrentBh.lux;
+        if (gAppState.gLastSendBh.lux != lux)
+        {
+            gAppState.gLastSendBh.lux = lux;
+
+            // Write a custom (binary-format) network message
+            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+            nserial::printf("Light: %d lx\n", va_t((u32)lux));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
+            if (gAppState.gSensorPacket.finalize() > 0)
+            {
+                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
             }
         }
 #endif
@@ -99,41 +142,48 @@ namespace ncore
         f32        bme_pres     = 0.0f;
         f32        bme_humi     = 0.0f;
         const bool valid_bme280 = nsensors::updateBME280(bme_pres, bme_temp, bme_humi);
-
         if (valid_bme280)
         {
-            const s8  bme_temp_s8  = static_cast<s8>(bme_temp);   // Temperature to one signed byte (°C)
-            const u16 bme_pres_u16 = static_cast<u16>(bme_pres);  // Pressure to unsigned short (hPa)
-            const u8  bme_humi_u8  = static_cast<u8>(bme_humi);   // Humidity to one unsigned byte (%)
+            gAppState.gCurrentBme.temperature = static_cast<s8>(bme_temp);   // Temperature to one signed byte (°C)
+            gAppState.gCurrentBme.pressure    = static_cast<u16>(bme_pres);  // Pressure to unsigned short (hPa)
+            gAppState.gCurrentBme.humidity    = static_cast<u8>(bme_humi);   // Humidity to one unsigned byte (%)
+        }
+#endif
+        return ntask::RESULT_OK;
+    }
 
-            // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+    ntask::result_t send_bme280(state_t* state)
+    {
+#ifdef ENABLE_BME280
+        // Write a custom (binary-format) network message
+        gAppState.gSensorPacket.begin(state->wifi->m_mac);
 
-            if (gAppState.gLastBme_temp_s8 != bme_temp_s8)
-            {
-                gAppState.gLastBme_temp_s8 = bme_temp_s8;
-                nserial::printf("Temperature: %d °C\n", va_t((s32)bme_temp_s8));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)bme_temp_s8);
-            }
-            if (gAppState.gLastBme_pres_u16 != bme_pres_u16)
-            {
-                gAppState.gLastBme_pres_u16 = bme_pres_u16;
-                nserial::printf("Pressure: %d hPa\n", va_t((u32)bme_pres_u16));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESSURE, (u16)bme_pres_u16);
-            }
-            if (gAppState.gLastBme_humi_u8 != bme_humi_u8)
-            {
-                gAppState.gLastBme_humi_u8 = bme_humi_u8;
-                nserial::printf("Humidity: %d %%\n", va_t((u32)bme_humi_u8));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)bme_humi_u8);
-            }
-
-            if (gAppState.gSensorPacket.finalize() > 0)
-            {
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
-            }
+        const s8  temperature = gAppState.gCurrentBme.temperature;
+        const u16 pressure    = gAppState.gCurrentBme.pressure;
+        const u8  humidity    = gAppState.gCurrentBme.humidity;
+        if (gAppState.gLastSendBme.temperature != temperature)
+        {
+            gAppState.gLastSendBme.temperature = temperature;
+            nserial::printf("Temperature: %d °C\n", va_t((s32)temperature));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
+        }
+        if (gAppState.gLastSendBme.pressure != pressure)
+        {
+            gAppState.gLastSendBme.pressure = pressure;
+            nserial::printf("Pressure: %d hPa\n", va_t((u32)pressure));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESSURE, (u16)pressure);
+        }
+        if (gAppState.gLastSendBme.humidity != humidity)
+        {
+            gAppState.gLastSendBme.humidity = humidity;
+            nserial::printf("Humidity: %d %%\n", va_t((u32)humidity));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
         }
 
+        if (gAppState.gSensorPacket.finalize() > 0)
+        {
+            nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+        }
 #endif
         return ntask::RESULT_OK;
     }
@@ -149,35 +199,47 @@ namespace ncore
 
         if (valid_scd41)
         {
-            // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+            gAppState.gCurrentScd.co2         = scd_co2;
+            gAppState.gCurrentScd.temperature = static_cast<s8>(scd_temp);
+            gAppState.gCurrentScd.humidity    = static_cast<u8>(scd_humi);
+        }
+#endif
 
-            const s8 scd_temp_s8 = static_cast<s8>(scd_temp);  // Temperature to one signed byte (°C)
-            const u8 scd_humi_u8 = static_cast<u8>(scd_humi);  // Humidity to one unsigned byte (%)
+        return ntask::RESULT_OK;
+    }
 
-            if (gAppState.gLastScd_co2 != scd_co2)
-            {
-                gAppState.gLastScd_co2 = scd_co2;
-                nserial::printf("SCD CO2: %d ppm\n", va_t((u32)scd_co2));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_CO2, (u16)scd_co2);
-            }
-            if (gAppState.gLastScd_temp_s8 != scd_temp_s8)
-            {
-                gAppState.gLastScd_temp_s8 = scd_temp_s8;
-                nserial::printf("SCD Temperature: %d °C\n", va_t((s32)scd_temp_s8));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)scd_temp_s8);
-            }
-            if (gAppState.gLastScd_humi_u8 != scd_humi_u8)
-            {
-                gAppState.gLastScd_humi_u8 = scd_humi_u8;
-                nserial::printf("SCD Humidity: %d %%\n", va_t((u32)scd_humi_u8));
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)scd_humi_u8);
-            }
+    ntask::result_t send_scd41(state_t* state)
+    {
+#ifdef ENABLE_SCD41
+        // Write a custom (binary-format) network message
+        gAppState.gSensorPacket.begin(state->wifi->m_mac);
 
-            if (gAppState.gSensorPacket.finalize() > 0)
-            {
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
-            }
+        const u16 co2         = gAppState.gCurrentScd.co2;
+        const s8  temperature = gAppState.gCurrentScd.temperature;
+        const u8  humidity    = gAppState.gCurrentScd.humidity;
+
+        if (gAppState.gLastSendScd.co2 != co2)
+        {
+            gAppState.gLastSendScd.co2 = co2;
+            nserial::printf("SCD CO2: %d ppm\n", va_t((u32)co2));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_CO2, (u16)co2);
+        }
+        if (gAppState.gLastSendScd.temperature != temperature)
+        {
+            gAppState.gLastSendScd.temperature = temperature;
+            nserial::printf("SCD Temperature: %d °C\n", va_t((s32)temperature));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
+        }
+        if (gAppState.gLastSendScd.humidity != humidity)
+        {
+            gAppState.gLastSendScd.humidity = humidity;
+            nserial::printf("SCD Humidity: %d %%\n", va_t((u32)humidity));
+            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
+        }
+
+        if (gAppState.gSensorPacket.finalize() > 0)
+        {
+            nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif
 
@@ -189,52 +251,64 @@ namespace ncore
 #ifdef ENABLE_RD03D
         if (nsensors::nrd03d::update())
         {
-            // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin(state->wifi->m_mac);
-
-            nsensors::nrd03d::target_t tgt[3];
             for (s8 i = 0; i < 3; ++i)
             {
-                if (nsensors::nrd03d::getTarget(i, tgt[i]))
+                nsensors::nrd03d::target_t tgt;
+                if (nsensors::nrd03d::getTarget(i, tgt))
                 {
-                    gAppState.gRd03dDetectionBits[i] = (gAppState.gRd03dDetectionBits[i] << 1) | 1;
-                    //nserial::printf("T%d: %d, %d\n", va_t(i), va_t(tgt[i].x), va_t(tgt[i].y));
+                    gAppState.gCurrentRd03d.DetectionBits[i] = (gAppState.gCurrentRd03d.DetectionBits[i] << 1) | 1;
+                    // nserial::printf("T%d: %d, %d\n", va_t(i), va_t(tgt[i].x), va_t(tgt[i].y));
                 }
                 else
                 {
-                    gAppState.gRd03dDetectionBits[i] = (gAppState.gRd03dDetectionBits[i] << 1) | 0;
+                    gAppState.gCurrentRd03d.DetectionBits[i] = (gAppState.gCurrentRd03d.DetectionBits[i] << 1) | 0;
                 }
 
-                u8 detected = gAppState.gRd03dDetected[i] & 1;  // Current detection state
+                u8 detected = gAppState.gCurrentRd03d.Detected[i] & 1;  // Current detection state
                 if (detected == 0)
                 {
                     // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
-                    if ((gAppState.gRd03dDetectionBits[i] & 0x7) == 0x7)
+                    if ((gAppState.gCurrentRd03d.DetectionBits[i] & 0x7) == 0x7)
                     {
+                        nserial::printf("T%d detection: %s\n", va_t(i), va_t("PRESENCE"));
                         detected = 1;
                     }
                 }
                 else
                 {
-                    // To transition from presence to no-presence we must have seen 20 no-detections in a row (2 seconds)
-                    if ((gAppState.gRd03dDetectionBits[i] & 0xFFFFF) == 0)
+                    // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
+                    if ((gAppState.gCurrentRd03d.DetectionBits[i] & 0xFFFFF) == 0)
                     {
+                        nserial::printf("T%d detection: %s\n", va_t(i), va_t("ABSENCE"));
                         detected = 0;
                     }
                 }
-
-                if (gAppState.gRd03dDetected[i] != detected)
-                {
-                    gAppState.gRd03dDetected[i] = detected;
-                    nserial::printf("T%d detection: %s\n", va_t(i), va_t(detected == 1 ? "PRESENCE" : "ABSENCE"));
-                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
-                }
+                gAppState.gCurrentRd03d.Detected[i] = detected;
             }
+        }
+#endif
+        return ntask::RESULT_OK;
+    }
 
-            if (gAppState.gSensorPacket.finalize() > 0)
+    ntask::result_t send_rd03d(state_t* state)
+    {
+#ifdef ENABLE_RD03D
+        // Write a custom (binary-format) network message
+        gAppState.gSensorPacket.begin(state->wifi->m_mac);
+
+        for (s8 i = 0; i < 3; ++i)
+        {
+            const bool detected = gAppState.gCurrentRd03d.Detected[i];
+            if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
             {
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+                gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
             }
+        }
+
+        if (gAppState.gSensorPacket.finalize() > 0)
+        {
+            nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif
         return ntask::RESULT_OK;
@@ -246,43 +320,82 @@ namespace ncore
 {
     namespace napp
     {
-        ntask::periodic_t periodic_bh1750(30000);  // Every half minute
-        ntask::periodic_t periodic_bme280(60000);  // Every minute
-        ntask::periodic_t periodic_scd41(120000);  // Every two minutes
-        ntask::periodic_t periodic_rd03d(100);     // Ten times per second
+        ntask::periodic_t periodic_read_bh1750(5 * 1000);
+        ntask::periodic_t periodic_read_bme280(10 * 1000);
+        ntask::periodic_t periodic_read_scd41(30 * 1000);
+        ntask::periodic_t periodic_read_rd03d(100);
+
+        ntask::periodic_t periodic_send_bh1750((30 * 1000) + 1);
+        ntask::periodic_t periodic_send_bme280((60 * 1000) + 2);
+        ntask::periodic_t periodic_send_scd41((2 * 60 * 1000) - 1);
+        ntask::periodic_t periodic_send_rd03d(200 + 3);
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
             if (ntask::is_first_call(exec))
             {
-                ntask::init_periodic(exec, periodic_bh1750);
-                ntask::init_periodic(exec, periodic_bme280);
-                ntask::init_periodic(exec, periodic_scd41);
-                ntask::init_periodic(exec, periodic_rd03d);
+                ntask::init_periodic(exec, periodic_read_bh1750);
+                ntask::init_periodic(exec, periodic_read_bme280);
+                ntask::init_periodic(exec, periodic_read_scd41);
+                ntask::init_periodic(exec, periodic_read_rd03d);
+
+                ntask::init_periodic(exec, periodic_send_bh1750);
+                ntask::init_periodic(exec, periodic_send_bme280);
+                ntask::init_periodic(exec, periodic_send_scd41);
+                ntask::init_periodic(exec, periodic_send_rd03d);
             }
 
+            // Reading sensor data
+
 #ifdef ENABLE_BH1750
-            if (ntask::periodic(exec, periodic_bh1750))
+            if (ntask::periodic(exec, periodic_read_bh1750))
             {
                 ntask::call(exec, read_bh1750);
             }
 #endif
 #ifdef ENABLE_BME280
-            if (ntask::periodic(exec, periodic_bme280))
+            if (ntask::periodic(exec, periodic_read_bme280))
             {
                 ntask::call(exec, read_bme280);
             }
 #endif
 #ifdef ENABLE_SCD41
-            if (ntask::periodic(exec, periodic_scd41))
+            if (ntask::periodic(exec, periodic_read_scd41))
             {
                 ntask::call(exec, read_scd41);
             }
 #endif
 #ifdef ENABLE_RD03D
-            if (ntask::periodic(exec, periodic_rd03d))
+            if (ntask::periodic(exec, periodic_read_rd03d))
             {
                 ntask::call(exec, read_rd03d);
+            }
+#endif
+
+            // Sending sensor data
+
+#ifdef ENABLE_BH1750
+            if (ntask::periodic(exec, periodic_send_bh1750))
+            {
+                ntask::call(exec, send_bh1750);
+            }
+#endif
+#ifdef ENABLE_BME280
+            if (ntask::periodic(exec, periodic_send_bme280))
+            {
+                ntask::call(exec, send_bme280);
+            }
+#endif
+#ifdef ENABLE_SCD41
+            if (ntask::periodic(exec, periodic_send_scd41))
+            {
+                ntask::call(exec, send_scd41);
+            }
+#endif
+#ifdef ENABLE_RD03D
+            if (ntask::periodic(exec, periodic_send_rd03d))
+            {
+                ntask::call(exec, send_rd03d);
             }
 #endif
         }
@@ -291,21 +404,32 @@ namespace ncore
 #define SDA_PIN 21
 #define SCL_PIN 22
 
+        void presetup()
+        {
+            // Initialize I2C bus
+            nwire::begin(SDA_PIN, SCL_PIN);  
+        }
+
         void setup(state_t* state)
         {
-            nwire::begin(SDA_PIN, SCL_PIN);  // Initialize I2C bus
-
 #ifdef ENABLE_BH1750
+            gAppState.gCurrentBh.reset();
+            gAppState.gLastSendBh.reset();
             nsensors::initBH1750();  // Initialize the BH1750 sensor
 #endif
 #ifdef ENABLE_BME280
+            gAppState.gCurrentBme.reset();
+            gAppState.gLastSendBme.reset();
             nsensors::initBME280();  // Initialize the BME280 sensor
 #endif
 #ifdef ENABLE_SCD41
+            gAppState.gCurrentScd.reset();
+            gAppState.gLastSendScd.reset();
             nsensors::initSCD41();  // Initialize the SCD4X sensor
 #endif
 #ifdef ENABLE_RD03D
-            nsensors::nrd03d::begin(16, 17);  // Initialize RD03D sensor with rx and tx pin
+            gAppState.gCurrentRd03d.reset();
+            nsensors::nrd03d::begin(16, 17);  // Initialize RD03D sensor UART rx and tx pin
 #endif
             ntask::set_main(state, &gAppTask, &gMainProgram);
             nnode::initialize(state, &gAppTask);
