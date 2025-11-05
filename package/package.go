@@ -48,11 +48,18 @@ func GetPackage() *denv.Package {
 	sh1107.AddDependencies(u8g2pkg.GetMainLib())
 	sh1107.AddSourceFiles("common", ".cpp")
 
+	mg58f18 := denv.SetupCppAppProject(mainpkg, "mg58f18", "mg58f18")
+	mg58f18.AddDependencies(wifipkg.GetMainLib())
+	mg58f18.AddDependencies(sensorspkg.GetMainLib())
+	mg58f18.AddDependencies(u8g2pkg.GetMainLib())
+	mg58f18.AddSourceFiles("common", ".cpp")
+
 	mainpkg.AddMainApp(airquality)
 	mainpkg.AddMainApp(humanpresence)
 	mainpkg.AddMainApp(magnet)
 	mainpkg.AddMainApp(rd03d)
 	mainpkg.AddMainApp(sh1107)
+	mainpkg.AddMainApp(mg58f18)
 
 	return mainpkg
 }
