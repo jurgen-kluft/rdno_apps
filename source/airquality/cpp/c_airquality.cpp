@@ -72,7 +72,7 @@ namespace ncore
             for (s8 i = 0; i < 3; ++i)
             {
                 DetectionBits[i]    = 0;
-                Detected[i]         = 2;  // Unknown state
+                Detected[i]         = 4;  // Unknown state
                 LastSendDetected[i] = 3;
             }
         }
@@ -264,26 +264,26 @@ namespace ncore
                     gAppState.gCurrentRd03d.DetectionBits[i] = (gAppState.gCurrentRd03d.DetectionBits[i] << 1) | 0;
                 }
 
-                u8 detected = gAppState.gCurrentRd03d.Detected[i] & 1;  // Current detection state
-                if (detected == 0)
+                u8 detected = gAppState.gCurrentRd03d.Detected[i] & 3;  // Current detection state
+
+                const bool dseen = (gAppState.gCurrentRd03d.DetectionBits[i] & 0x3F) == 0x3F;
+                if (dseen)
                 {
                     // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
-                    if ((gAppState.gCurrentRd03d.DetectionBits[i] & 0x7) == 0x7)
-                    {
-                        nserial::printf("T%d detection: %s\n", va_t(i), va_t("PRESENCE"));
-                        detected = 1;
-                    }
+                    detected = ((detected << 1) | 1);
                 }
                 else
                 {
-                    // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
-                    if ((gAppState.gCurrentRd03d.DetectionBits[i] & 0xFFFFF) == 0)
+                    const bool dnone = (gAppState.gCurrentRd03d.DetectionBits[i] & 0x3FFFFFFF) == 0;
+                    if (dnone)
                     {
-                        nserial::printf("T%d detection: %s\n", va_t(i), va_t("ABSENCE"));
-                        detected = 0;
+                        // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
+                        detected = ((detected << 1) | 0);
                     }
                 }
                 gAppState.gCurrentRd03d.Detected[i] = detected;
+
+                nserial::printf("T%d detection: %s\n", va_t(i), va_t((detected != 0) ? "PRESENCE" : "ABSENCE"));
             }
         }
 #endif
@@ -298,7 +298,7 @@ namespace ncore
 
         for (s8 i = 0; i < 3; ++i)
         {
-            const bool detected = gAppState.gCurrentRd03d.Detected[i];
+            const u8 detected = gAppState.gCurrentRd03d.Detected[i];
             if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
             {
                 gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
@@ -407,7 +407,7 @@ namespace ncore
         void presetup()
         {
             // Initialize I2C bus
-            nwire::begin(SDA_PIN, SCL_PIN);  
+            nwire::begin(SDA_PIN, SCL_PIN);
         }
 
         void setup(state_t* state)
