@@ -42,13 +42,13 @@ func GetPackage() *denv.Package {
 	rd03d.AddDependencies(sensorspkg.GetMainLib())
 	rd03d.AddSourceFiles("common", ".cpp")
 
-	sh1107 := denv.SetupCppAppProject(mainpkg, "sh1107", "sh1107")
+	sh1107 := denv.SetupCppAppProjectForArduinoEsp32(mainpkg, "sh1107", "sh1107")
 	sh1107.AddDependencies(wifipkg.GetMainLib())
 	sh1107.AddDependencies(sensorspkg.GetMainLib())
 	sh1107.AddDependencies(u8g2pkg.GetMainLib())
 	sh1107.AddSourceFiles("common", ".cpp")
 
-	mg58f18 := denv.SetupCppAppProject(mainpkg, "mg58f18", "mg58f18")
+	mg58f18 := denv.SetupCppAppProjectForArduinoEsp32(mainpkg, "mg58f18", "mg58f18")
 	mg58f18.AddDependencies(wifipkg.GetMainLib())
 	mg58f18.AddDependencies(sensorspkg.GetMainLib())
 	mg58f18.AddDependencies(u8g2pkg.GetMainLib())
