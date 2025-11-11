@@ -14,7 +14,6 @@
 
 #include "common/c_common.h"
 
-#include "Arduino.h"
 #include "rdno_u8g2/U8x8lib.h"
 #include "rdno_u8g2/U8g2lib.h"
 

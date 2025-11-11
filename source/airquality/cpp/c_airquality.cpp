@@ -7,6 +7,7 @@
 #include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
+#include "rdno_core/c_task.h"
 #include "rdno_core/c_wire.h"
 
 #include "rdno_wifi/c_tcp.h"
