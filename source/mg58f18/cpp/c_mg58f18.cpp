@@ -47,8 +47,7 @@ namespace ncore
 
         void presetup() 
         { 
-            ngpio::set_pin_as_input(5);
-            nsensors::nmg58f18::initialize(20, 21); 
+            nsensors::nmg58f18::initialize(20, 21, 5); 
         }
 
         void setup(state_t* state)
