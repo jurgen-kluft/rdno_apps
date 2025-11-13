@@ -37,11 +37,6 @@ func GetPackage() *denv.Package {
 	magnet.AddDependencies(sensorspkg.GetMainLib())
 	magnet.AddSourceFiles("common", ".cpp")
 
-	rd03d := denv.SetupCppAppProject(mainpkg, "rd03d", "rd03d")
-	rd03d.AddDependencies(wifipkg.GetMainLib())
-	rd03d.AddDependencies(sensorspkg.GetMainLib())
-	rd03d.AddSourceFiles("common", ".cpp")
-
 	sh1107 := denv.SetupCppAppProjectForArduinoEsp32(mainpkg, "sh1107", "sh1107")
 	sh1107.AddDependencies(wifipkg.GetMainLib())
 	sh1107.AddDependencies(sensorspkg.GetMainLib())
@@ -54,12 +49,23 @@ func GetPackage() *denv.Package {
 	mg58f18.AddDependencies(u8g2pkg.GetMainLib())
 	mg58f18.AddSourceFiles("common", ".cpp")
 
+	rd03d := denv.SetupCppAppProject(mainpkg, "rd03d", "rd03d")
+	rd03d.AddDependencies(wifipkg.GetMainLib())
+	rd03d.AddDependencies(sensorspkg.GetMainLib())
+	rd03d.AddSourceFiles("common", ".cpp")
+
+	hsp24 := denv.SetupCppAppProject(mainpkg, "hsp24", "hsp24")
+	hsp24.AddDependencies(wifipkg.GetMainLib())
+	hsp24.AddDependencies(sensorspkg.GetMainLib())
+	hsp24.AddSourceFiles("common", ".cpp")
+
 	mainpkg.AddMainApp(airquality)
 	mainpkg.AddMainApp(humanpresence)
 	mainpkg.AddMainApp(magnet)
-	mainpkg.AddMainApp(rd03d)
 	mainpkg.AddMainApp(sh1107)
 	mainpkg.AddMainApp(mg58f18)
+	mainpkg.AddMainApp(rd03d)
+	mainpkg.AddMainApp(hsp24)
 
 	return mainpkg
 }

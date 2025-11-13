@@ -7,6 +7,7 @@
 #include "rdno_core/c_packet.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_system.h"
+#include "rdno_core/c_task.h"
 
 #include "rdno_sensors/c_mg58f18.h"
 
