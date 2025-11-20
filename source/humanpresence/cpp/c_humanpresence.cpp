@@ -89,7 +89,7 @@ namespace ncore
                         gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_DISTANCE1, distanceInCm);
                     }
 
-                    if (gAppState.gSensorPacket.finalize() > 0)
+                    if (gAppState.gSensorPacket.count() > 0)
                     {
 #ifdef TARGET_DEBUG
                         nserial::print("Sending presence=");
@@ -101,6 +101,7 @@ namespace ncore
                         nserial::print(distanceStr.m_const);
                         nserial::println(" cm");
 #endif
+                        gAppState.gSensorPacket.finalize();
                         nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
                     }
                 }

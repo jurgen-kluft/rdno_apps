@@ -126,10 +126,8 @@ namespace ncore
             gAppState.gSensorPacket.begin(state->wifi->m_mac);
             nserial::printf("Light: %d lx\n", va_t((u32)lux));
             gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
-            if (gAppState.gSensorPacket.finalize() > 0)
-            {
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
-            }
+            gAppState.gSensorPacket.finalize();
+            nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif
         return ntask::RESULT_OK;
@@ -181,8 +179,9 @@ namespace ncore
             gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
         }
 
-        if (gAppState.gSensorPacket.finalize() > 0)
+        if (gAppState.gSensorPacket.count() > 0)
         {
+            gAppState.gSensorPacket.finalize();
             nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif
@@ -238,8 +237,9 @@ namespace ncore
             gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
         }
 
-        if (gAppState.gSensorPacket.finalize() > 0)
+        if (gAppState.gSensorPacket.count() > 0)
         {
+            gAppState.gSensorPacket.finalize();
             nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif
@@ -307,8 +307,9 @@ namespace ncore
             }
         }
 
-        if (gAppState.gSensorPacket.finalize() > 0)
+        if (gAppState.gSensorPacket.count() > 0)
         {
+            gAppState.gSensorPacket.finalize();
             nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
 #endif

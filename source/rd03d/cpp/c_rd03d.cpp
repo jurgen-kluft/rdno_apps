@@ -20,7 +20,7 @@ namespace ncore
 {
     struct rd03d_data_t
     {
-        u32 DetectionBits[3];
+        u64 DetectionBits[3];
         u8  Detected[3];
         u8  LastSendDetected[3];
 
@@ -30,7 +30,7 @@ namespace ncore
             {
                 DetectionBits[i]    = 0;
                 Detected[i]         = 4;  // Unknown state
-                LastSendDetected[i] = 3;
+                LastSendDetected[i] = 8;
             }
         }
     };
@@ -48,7 +48,7 @@ namespace ncore
 {
     namespace napp
     {
-        ntask::result_t read_rd03d(state_t* state)
+        ntask::result_t process_rd03d(state_t* state)
         {
 #ifdef ENABLE_RD03D
             if (nsensors::nrd03d::update())
@@ -59,16 +59,14 @@ namespace ncore
                     if (nsensors::nrd03d::getTarget(i, tgt))
                     {
                         gAppState.gCurrentRd03d.DetectionBits[i] = (gAppState.gCurrentRd03d.DetectionBits[i] << 1) | 1;
-                        // nserial::printf("T%d: %d, %d\n", va_t(i), va_t(tgt[i].x), va_t(tgt[i].y));
                     }
                     else
                     {
                         gAppState.gCurrentRd03d.DetectionBits[i] = (gAppState.gCurrentRd03d.DetectionBits[i] << 1) | 0;
                     }
 
-                    u8 detected = gAppState.gCurrentRd03d.Detected[i] & 3;  // Current detection state
-
-                    const bool dseen = (gAppState.gCurrentRd03d.DetectionBits[i] & 0x3F) == 0x3F;
+                    u8         detected = gAppState.gCurrentRd03d.Detected[i];
+                    const bool dseen    = (gAppState.gCurrentRd03d.DetectionBits[i] != 0);
                     if (dseen)
                     {
                         // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
@@ -76,70 +74,79 @@ namespace ncore
                     }
                     else
                     {
-                        const bool dnone = (gAppState.gCurrentRd03d.DetectionBits[i] & 0x3FFFFFFF) == 0;
+                        const bool dnone = gAppState.gCurrentRd03d.DetectionBits[i] == 0;
                         if (dnone)
                         {
-                            // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
+                            // To transition from presence to no-presence we must have seen 32 no-detections in a row (~3 seconds)
                             detected = ((detected << 1) | 0);
                         }
                     }
                     gAppState.gCurrentRd03d.Detected[i] = detected;
 
-                    nserial::printf("T%d detection: %s\n", va_t(i), va_t((detected != 0) ? "PRESENCE" : "ABSENCE"));
+                    if (detected == 0x80)
+                    {
+                        nserial::printf("Status: PRESENCE 1 -> 0 (distance: %d,%d)\n", va_t(tgt.x), va_t(tgt.y));
+                    }
+                    else if (detected == 0x01)
+                    {
+                        nserial::printf("Status: PRESENCE 0 -> 1 (distance: %d,%d)\n", va_t(tgt.x), va_t(tgt.y));
+                    }
+                    else if (detected != 0x0)
+                    {
+                        nserial::printf("Status: PRESENCE (distance: %d,%d)\n", va_t(tgt.x), va_t(tgt.y));
+                    }
+                    else
+                    {
+                        nserial::printf("Status: ABSENCE\n");
+                    }
                 }
-            }
-#endif
-            return ntask::RESULT_OK;
-        }
 
-        ntask::result_t send_rd03d(state_t* state)
-        {
-#ifdef ENABLE_RD03D
-            // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+                // Write a custom (binary-format) network message
+                gAppState.gSensorPacket.begin(state->wifi->m_mac);
 
-            for (s8 i = 0; i < 3; ++i)
-            {
-                const u8 detected = gAppState.gCurrentRd03d.Detected[i];
-                if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
+                for (s8 i = 0; i < 3; ++i)
                 {
-                    gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
-                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
-                }
-            }
+                    u8 detected = gAppState.gCurrentRd03d.Detected[i];
+                    if (detected == 0x80)
+                        detected = 2;
+                    else if (detected == 0x01)
+                        detected = 1;
+                    else if (detected != 0x00)
+                        detected = 3;
 
-            if (gAppState.gSensorPacket.finalize() > 0)
-            {
-                nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+                    if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
+                    {
+                        gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
+                        gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
+                    }
+                }
+
+                if (gAppState.gSensorPacket.count() > 0)
+                {
+                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state) & 0xFFFF);
+                    gAppState.gSensorPacket.finalize();
+                    
+                    nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
+                }
             }
 #endif
             return ntask::RESULT_OK;
         }
 
-        ntask::periodic_t periodic_read_rd03d(100);
-        ntask::periodic_t periodic_send_rd03d(200 + 3);
+        ntask::periodic_t periodic_process_rd03d(100);
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
             if (ntask::is_first_call(exec))
             {
-                ntask::init_periodic(exec, periodic_read_rd03d);
-                ntask::init_periodic(exec, periodic_send_rd03d);
+                ntask::init_periodic(exec, periodic_process_rd03d);
             }
 
-            // Reading sensor data
+            // Process sensor data
 #ifdef ENABLE_RD03D
-            if (ntask::periodic(exec, periodic_read_rd03d))
+            if (ntask::periodic(exec, periodic_process_rd03d))
             {
-                ntask::call(exec, read_rd03d);
-            }
-#endif
-
-            // Sending sensor data
-#ifdef ENABLE_RD03D
-            if (ntask::periodic(exec, periodic_send_rd03d))
-            {
-                ntask::call(exec, send_rd03d);
+                ntask::call(exec, process_rd03d);
             }
 #endif
         }

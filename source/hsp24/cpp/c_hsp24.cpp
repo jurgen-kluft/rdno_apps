@@ -28,7 +28,7 @@ namespace ncore
         {
             DetectionBits    = 0;
             Detected         = 4;  // Unknown state
-            LastSendDetected = 3;
+            LastSendDetected = 8;  // Impossible state
         }
     };
 
@@ -52,44 +52,21 @@ namespace ncore
             nsensors::nseeed::RadarStatus status;
             if (nsensors::nseeed::getStatus(gAppState.gSensor, status) == nsensors::nseeed::Success)
             {
-                // for (s8 i = 0; i < 3; ++i)
-                // {
-                //     nsensors::nseeed::target_t tgt;
-                //     if (nsensors::nseeed::getTarget(i, tgt))
-                //     {
-                //         gAppState.gCurrentHsp24.DetectionBits[i] = (gAppState.gCurrentHsp24.DetectionBits[i] << 1) | 1;
-                //         // nserial::printf("T%d: %d, %d\n", va_t(i), va_t(tgt[i].x), va_t(tgt[i].y));
-                //     }
-                //     else
-                //     {
-                //         gAppState.gCurrentHsp24.DetectionBits[i] = (gAppState.gCurrentHsp24.DetectionBits[i] << 1) | 0;
-                //     }
-
-                //     u8 detected = gAppState.gCurrentHsp24.Detected[i] & 3;  // Current detection state
-
-                //     const bool dseen = (gAppState.gCurrentHsp24.DetectionBits[i] & 0x3F) == 0x3F;
-                //     if (dseen)
-                //     {
-                //         // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
-                //         detected = ((detected << 1) | 1);
-                //     }
-                //     else
-                //     {
-                //         const bool dnone = (gAppState.gCurrentHsp24.DetectionBits[i] & 0x3FFFFFFF) == 0;
-                //         if (dnone)
-                //         {
-                //             // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
-                //             detected = ((detected << 1) | 0);
-                //         }
-                //     }
-                //     gAppState.gCurrentHsp24.Detected[i] = detected;
-                //     nserial::printf("T%d detection: %s\n", va_t(i), va_t((detected != 0) ? "PRESENCE" : "ABSENCE"));
-                // }
                 const u64 detectionBit                = isTargetDetected(status.targetStatus) ? 1 : 0;
                 gAppState.gCurrentHsp24.DetectionBits = (gAppState.gCurrentHsp24.DetectionBits << 1) | detectionBit;
 
-                u8 detected = gAppState.gCurrentHsp24.Detected & 3;
-                const bool dseen = (gAppState.gCurrentHsp24.DetectionBits & 0x3F) == 0x3F;
+                // Draw a graph, going from 0 to 1 (up-flank), then from 1 to 3 which means up stays up, then when
+                // going from 3 to 1 (down-flank) and finally from 1 to 0.
+
+                //  PRESENCE                    3---------------------------|
+                //                              |                           |
+                //  PRESENCE               1----|                           1---|
+                //                         |                                    |
+                //  ABSENCE      0 --------|                                    0 ---------
+                //
+
+                u8         detected = gAppState.gCurrentHsp24.Detected;
+                const bool dseen    = (gAppState.gCurrentHsp24.DetectionBits != 0);
                 if (dseen)
                 {
                     // Too transition from no-presence to presence we must have seen 3 detections in a row (300 ms)
@@ -97,15 +74,31 @@ namespace ncore
                 }
                 else
                 {
-                    const bool dnone = (gAppState.gCurrentHsp24.DetectionBits & 0x3FFFFFFFFFFFFFFFUL) == 0;
+                    const bool dnone = gAppState.gCurrentHsp24.DetectionBits == 0;
                     if (dnone)
                     {
-                        // To transition from presence to no-presence we must have seen 30 no-detections in a row (3 seconds)
+                        // To transition from presence to no-presence we must have seen 32 no-detections in a row (~3 seconds)
                         detected = ((detected << 1) | 0);
                     }
                 }
                 gAppState.gCurrentHsp24.Detected = detected;
-                nserial::printf("Status: %s (distance: %d)\n", va_t((detected != 0) ? "PRESENCE" : "ABSENCE"), va_t(status.detectionDistance));
+
+                if (detected == 0x80)
+                {
+                    nserial::printf("Status: PRESENCE 1 -> 0 (distance: %d)\n", va_t(status.detectionDistance));
+                }
+                else if (detected == 0x01)
+                {
+                    nserial::printf("Status: PRESENCE 0 -> 1 (distance: %d)\n", va_t(status.detectionDistance));
+                }
+                else if (detected != 0x0)
+                {
+                    nserial::printf("Status: PRESENCE (distance: %d)\n", va_t(status.detectionDistance));
+                }
+                else
+                {
+                    nserial::printf("Status: ABSENCE\n");
+                }
             }
 #endif
             return ntask::RESULT_OK;
@@ -114,18 +107,24 @@ namespace ncore
         ntask::result_t send_presence(state_t* state)
         {
 #ifdef ENABLE_HSP24
-            // Write a custom (binary-format) network message
-            gAppState.gSensorPacket.begin(state->wifi->m_mac);
+            u8 detected = gAppState.gCurrentHsp24.Detected;
+            if (detected == 0x80)
+                detected = 2;
+            else if (detected == 0x01)
+                detected = 1;
+            else if (detected != 0x0)
+                detected = 3;
 
-            const u8 detected = gAppState.gCurrentHsp24.Detected;
             if (gAppState.gCurrentHsp24.LastSendDetected != detected)
             {
                 gAppState.gCurrentHsp24.LastSendDetected = detected;
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1, detected);
-            }
 
-            if (gAppState.gSensorPacket.finalize() > 0)
-            {
+                // Write a custom (binary-format) network message
+                gAppState.gSensorPacket.begin(state->wifi->m_mac);
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1, detected & 3);
+                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state));
+                gAppState.gSensorPacket.finalize();
+
                 nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
             }
 #endif
@@ -133,7 +132,7 @@ namespace ncore
         }
 
         ntask::periodic_t periodic_read_presence(100);
-        ntask::periodic_t periodic_send_presence(200 + 3);
+        ntask::periodic_t periodic_send_presence(50 + 3);
 
         void main_program(ntask::scheduler_t* exec, state_t* state)
         {
