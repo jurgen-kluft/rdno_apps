@@ -32,7 +32,7 @@ func GetPackage() *denv.Package {
 	humanpresence.AddDependencies(sensorspkg.GetMainLib())
 	humanpresence.AddSourceFiles("common", ".cpp")
 
-	magnet := denv.SetupCppAppProject(mainpkg, "magnet", "magnet")
+	magnet := denv.SetupCppAppProjectForArduinoEsp8266(mainpkg, "magnet", "magnet")
 	magnet.AddDependencies(wifipkg.GetMainLib())
 	magnet.AddDependencies(sensorspkg.GetMainLib())
 	magnet.AddSourceFiles("common", ".cpp")

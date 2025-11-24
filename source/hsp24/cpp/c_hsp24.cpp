@@ -165,8 +165,8 @@ namespace ncore
         void presetup()
         {
             // Initialize RD03D sensor with rx and tx pin
-            gAppState.gSensor = nsensors::nseeed::create_hsp24(ncore::nserial1::getStream());
-            nserial1::begin(nbaud::Rate9600, nconfig::MODE_8N1, 4, 5);
+            gAppState.gSensor = nsensors::nseeed::create_hsp24(ncore::nserialx::reader(ncore::nserialx::SERIAL1));
+            nserialx::begin(nserialx::SERIAL1, nbaud::Rate9600, nconfig::MODE_8N1, 4, 5);
         }
 
         void setup(state_t* state)
