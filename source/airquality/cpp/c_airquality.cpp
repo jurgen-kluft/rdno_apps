@@ -81,7 +81,7 @@ namespace ncore
 
     struct state_app_t
     {
-        npacket::packet_t gSensorPacket;  // Sensor packet for sending data
+        npacket::sensorpacket_t gSensorPacket;  // Sensor packet for sending data
 
         bme280_data_t gCurrentBme;
         bme280_data_t gLastSendBme;
@@ -125,7 +125,7 @@ namespace ncore
             // Write a custom (binary-format) network message
             gAppState.gSensorPacket.begin(state->wifi->m_mac);
             nserial::printf("Light: %d lx\n", va_t((u32)lux));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_LIGHT, lux);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_LIGHT, lux);
             gAppState.gSensorPacket.finalize();
             nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
         }
@@ -164,19 +164,19 @@ namespace ncore
         {
             gAppState.gLastSendBme.temperature = temperature;
             nserial::printf("Temperature: %d °C\n", va_t((s32)temperature));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
         }
         if (gAppState.gLastSendBme.pressure != pressure)
         {
             gAppState.gLastSendBme.pressure = pressure;
             nserial::printf("Pressure: %d hPa\n", va_t((u32)pressure));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESSURE, (u16)pressure);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_PRESSURE, (u16)pressure);
         }
         if (gAppState.gLastSendBme.humidity != humidity)
         {
             gAppState.gLastSendBme.humidity = humidity;
             nserial::printf("Humidity: %d %%\n", va_t((u32)humidity));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
         }
 
         if (gAppState.gSensorPacket.count() > 0)
@@ -222,19 +222,19 @@ namespace ncore
         {
             gAppState.gLastSendScd.co2 = co2;
             nserial::printf("SCD CO2: %d ppm\n", va_t((u32)co2));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_CO2, (u16)co2);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_CO2, (u16)co2);
         }
         if (gAppState.gLastSendScd.temperature != temperature)
         {
             gAppState.gLastSendScd.temperature = temperature;
             nserial::printf("SCD Temperature: %d °C\n", va_t((s32)temperature));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_TEMPERATURE, (u16)temperature);
         }
         if (gAppState.gLastSendScd.humidity != humidity)
         {
             gAppState.gLastSendScd.humidity = humidity;
             nserial::printf("SCD Humidity: %d %%\n", va_t((u32)humidity));
-            gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
+            gAppState.gSensorPacket.write(npacket::nsensorid::ID_HUMIDITY, (u16)humidity);
         }
 
         if (gAppState.gSensorPacket.count() > 0)
@@ -303,7 +303,7 @@ namespace ncore
             if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
             {
                 gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
+                gAppState.gSensorPacket.write(npacket::nsensorid::ID_PRESENCE1 + i, detected);
             }
         }
 
@@ -406,7 +406,7 @@ namespace ncore
 #define SDA_PIN 21
 #define SCL_PIN 22
 
-        void presetup()
+        void presetup(state_t* state)
         {
             // Initialize I2C bus
             nwire::begin(SDA_PIN, SCL_PIN);

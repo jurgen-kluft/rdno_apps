@@ -85,7 +85,7 @@ namespace ncore
 {
     namespace napp
     {
-        void presetup()
+        void presetup(state_t* state)
         {
             // Initialize I2C bus
             nwire::begin(DISPLAY_SDA, DISPLAY_SCL);

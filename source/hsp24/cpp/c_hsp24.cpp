@@ -34,7 +34,7 @@ namespace ncore
 
     struct state_app_t
     {
-        npacket::packet_t          gSensorPacket;  // Sensor packet for sending data
+        npacket::sensorpacket_t    gSensorPacket;  // Sensor packet for sending data
         hsp24_data_t               gCurrentHsp24;
         nsensors::nseeed::hsp24_t* gSensor;
     };
@@ -121,8 +121,8 @@ namespace ncore
 
                 // Write a custom (binary-format) network message
                 gAppState.gSensorPacket.begin(state->wifi->m_mac);
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1, detected & 3);
-                gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state));
+                gAppState.gSensorPacket.write(npacket::nsensorid::ID_PRESENCE1, detected & 3);
+                gAppState.gSensorPacket.write(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state));
                 gAppState.gSensorPacket.finalize();
 
                 nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
@@ -162,7 +162,7 @@ namespace ncore
 
         state_task_t gAppTask;
 
-        void presetup()
+        void presetup(state_t* state)
         {
             // Initialize RD03D sensor with rx and tx pin
             gAppState.gSensor = nsensors::nseeed::create_hsp24(ncore::nserialx::reader(ncore::nserialx::SERIAL1));

@@ -46,7 +46,7 @@ namespace ncore
         ntask::program_t gMainProgram(main_program);
         state_task_t     gAppTask;
 
-        void presetup() 
+        void presetup(state_t* state) 
         { 
             nsensors::nmg58f18::initialize(20, 21, 5); 
         }

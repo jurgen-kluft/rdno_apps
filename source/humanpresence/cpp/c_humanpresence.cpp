@@ -18,15 +18,15 @@ namespace ncore
 {
     struct state_app_t
     {
-        u64               gLastSensorReadTimeInMillis = 0;
-        npacket::packet_t gSensorPacket;                // Sensor packet for sending data
-        u16               gSequence           = 0;      // Sequence number for the packet
-        const u8          kVersion            = 1;      // Version number for the packet
-        s16               gLastDistanceInCm   = 32768;  // Last distance value read from the sensor
-        s8                gLastPresence       = 0;      // Last presence value read from the sensor
-        u64               gLastPresenceStream = 0;      // Last presence value read from the sensor
-        s8                gLastPresence0      = 64;
-        s8                gLastPresence1      = 0;
+        u64                     gLastSensorReadTimeInMillis = 0;
+        npacket::sensorpacket_t gSensorPacket;                // Sensor packet for sending data
+        u16                     gSequence           = 0;      // Sequence number for the packet
+        const u8                kVersion            = 1;      // Version number for the packet
+        s16                     gLastDistanceInCm   = 32768;  // Last distance value read from the sensor
+        s8                      gLastPresence       = 0;      // Last presence value read from the sensor
+        u64                     gLastPresenceStream = 0;      // Last presence value read from the sensor
+        s8                      gLastPresence0      = 64;
+        s8                      gLastPresence1      = 0;
     };
 
     state_app_t gAppState;
@@ -82,11 +82,11 @@ namespace ncore
                 {
                     gAppState.gLastPresence = presence;
 
-                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1, (u16)presence);
+                    gAppState.gSensorPacket.write(npacket::nsensorid::ID_PRESENCE1, (u16)presence);
                     if (distanceInCm > 0 && distanceInCm < 3200)
                     {
                         gAppState.gLastDistanceInCm = distanceInCm;
-                        gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_DISTANCE1, distanceInCm);
+                        gAppState.gSensorPacket.write(npacket::nsensorid::ID_DISTANCE1, distanceInCm);
                     }
 
                     if (gAppState.gSensorPacket.count() > 0)
@@ -110,7 +110,7 @@ namespace ncore
         }
 
         ntask::periodic_t gReadPeriodic(100);  // Every 100 ms
-        void main_program(ntask::scheduler_t* exec, state_t* state)
+        void              main_program(ntask::scheduler_t* exec, state_t* state)
         {
             if (ntask::is_first_call(exec))
             {
@@ -127,7 +127,7 @@ namespace ncore
         ntask::program_t gMainProgram(main_program);
         state_task_t     gAppTask;
 
-        void presetup()
+        void presetup(state_t* state)
         {
             // This is where you would set up your hardware, peripherals, etc.
         }
@@ -145,10 +145,7 @@ namespace ncore
             nserial::println("Setup done...");
         }
 
-        void tick(state_t* state)
-        {
-            ntask::tick(state, &gAppTask);
-        }
+        void tick(state_t* state) { ntask::tick(state, &gAppTask); }
 
     }  // namespace napp
 }  // namespace ncore

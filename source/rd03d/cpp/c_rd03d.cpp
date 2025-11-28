@@ -37,8 +37,8 @@ namespace ncore
 
     struct state_app_t
     {
-        npacket::packet_t gSensorPacket;  // Sensor packet for sending data
-        rd03d_data_t      gCurrentRd03d;
+        npacket::sensorpacket_t gSensorPacket;  // Sensor packet for sending data
+        rd03d_data_t            gCurrentRd03d;
     };
 
     state_app_t gAppState;
@@ -117,15 +117,15 @@ namespace ncore
                     if (gAppState.gCurrentRd03d.LastSendDetected[i] != detected)
                     {
                         gAppState.gCurrentRd03d.LastSendDetected[i] = detected;
-                        gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_PRESENCE1 + i, detected);
+                        gAppState.gSensorPacket.write(npacket::nsensorid::ID_PRESENCE1 + i, detected);
                     }
                 }
 
                 if (gAppState.gSensorPacket.count() > 0)
                 {
-                    gAppState.gSensorPacket.write_sensor(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state) & 0xFFFF);
+                    gAppState.gSensorPacket.write(npacket::nsensorid::ID_RSSI, nwifi::get_RSSI(state) & 0xFFFF);
                     gAppState.gSensorPacket.finalize();
-                    
+
                     nnode::send_sensor_data(state, gAppState.gSensorPacket.Data, gAppState.gSensorPacket.Size);
                 }
             }
@@ -154,7 +154,7 @@ namespace ncore
 
         state_task_t gAppTask;
 
-        void presetup()
+        void presetup(state_t* state)
         {
             // Initialize RD03D sensor with rx and tx pin
             nsensors::nrd03d::begin(20, 21);
